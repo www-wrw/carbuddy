@@ -12,21 +12,29 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand">
-        <span class="logo">CarBuddy</span>
-        <span class="tag">email-only, out-the-door car buying</span>
+      <div class="topbar-row">
+        <div class="brand">
+          <span class="logo">CarBuddy</span>
+          <span class="tag">email-only, out-the-door car buying</span>
+        </div>
+        <button class="hamburger" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="drawer">
+          <span></span><span></span><span></span>
+        </button>
       </div>
       <div class="privacy-note"><span class="dot"></span> Everything stays in your browser — nothing is ever uploaded.</div>
     </header>
 
-    <nav class="nav" id="nav">
-      <a href="#playbook"><span class="ico">🧭</span>Playbook</a>
-      <a href="#dashboard"><span class="ico">📋</span>Dealers</a>
-      <a href="#calculator"><span class="ico">🧮</span>Calculator</a>
-      <a href="#templates"><span class="ico">✉️</span>Emails</a>
-      <a href="#fees"><span class="ico">🔍</span>Fees</a>
-      <a href="#guide"><span class="ico">🚩</span>Guide</a>
-      <a href="#data"><span class="ico">🔒</span>Data</a>
+    <div class="scrim" id="scrim" hidden></div>
+    <nav class="drawer" id="drawer" aria-label="Main navigation" aria-hidden="true">
+      <div class="drawer-head"><span>Menu</span>
+        <button class="drawer-close" id="menu-close" aria-label="Close menu">✕</button></div>
+      <a href="#playbook"><span class="ico">🧭</span> Home</a>
+      <a href="#dashboard"><span class="ico">📋</span> Dealers</a>
+      <a href="#calculator"><span class="ico">🧮</span> Calculator</a>
+      <a href="#templates"><span class="ico">✉️</span> Emails</a>
+      <a href="#fees"><span class="ico">🔍</span> Fee decoder</a>
+      <a href="#guide"><span class="ico">🚩</span> Field guide</a>
+      <a href="#data"><span class="ico">🔒</span> Your data</a>
     </nav>
 
     <main id="main">

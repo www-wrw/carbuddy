@@ -223,19 +223,46 @@
   /* ============================================================ PLAYBOOK (E) */
   function renderPlaybook() {
     var steps = C.playbook.map(function (s) {
-      return '<div class="step"><div class="n num">' + s.n + '</div><div class="body">' +
-        "<h3>" + esc(s.title) + "</h3><p>" + esc(s.body) + "</p>" +
-        '<a class="btn btn-sm btn-ghost" href="#' + s.link + '">Go to ' + linkName(s.link) + " →</a></div></div>";
-    }).join('<div class="divider"></div>');
+      return '<a class="onb-step" href="#' + s.link + '">' +
+        '<div class="n num">' + s.n + "</div>" +
+        '<div class="onb-body">' +
+          '<div class="onb-title">' + esc(s.title) + "</div>" +
+          '<div class="onb-desc">' + esc(s.body) + "</div>" +
+          '<div class="onb-go">' + linkName(s.link) + " →</div>" +
+        "</div></a>";
+    }).join("");
     $("#section-playbook").innerHTML =
-      "<h1>The playbook</h1>" +
-      '<p class="section-intro">Dealers win when buyers negotiate one at a time, on monthly payment, ' +
-      "by phone, without knowing which fees are fake. This flips all four: many dealers at once, " +
-      "out-the-door only, in writing, every fee decoded. Work the steps in order.</p>" + steps;
+      '<div class="hero">' +
+        "<h1>Buy your car<br>without the stress.</h1>" +
+        "<p>You’re about to run the process dealers hope you never learn: contact many dealers at " +
+        "once, compare on out-the-door price only, keep everything in writing, and decode every fee. " +
+        "Here’s your step-by-step.</p>" +
+        '<div class="principles">' +
+          '<span class="principle">📨 Many dealers at once</span>' +
+          '<span class="principle">🏷️ Out-the-door only</span>' +
+          '<span class="principle">✍️ In writing</span>' +
+          '<span class="principle">🔍 Every fee decoded</span>' +
+        "</div>" +
+        '<a class="btn btn-primary btn-lg" href="#dashboard">Start — set up your dealers →</a>' +
+      "</div>" +
+      '<h2 class="onb-h">Your 7-step playbook</h2>' +
+      '<p class="hint">Tap any step to jump to the tool for it. Or open the menu (☰) anytime.</p>' +
+      '<div class="onb-steps">' + steps + "</div>";
   }
   function linkName(id) {
-    return { playbook: "Playbook", dashboard: "Dealers", calculator: "Calculator",
-             templates: "Emails", fees: "Fee Decoder", guide: "Guide", data: "Data" }[id] || id;
+    return { playbook: "Home", dashboard: "Dealers", calculator: "Calculator",
+             templates: "Emails", fees: "Fee Decoder", guide: "Field Guide", data: "Your Data" }[id] || id;
+  }
+
+  // linear prev/next footer so the process flows without a persistent nav
+  var FLOW = ["playbook", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  function flowNav(id) {
+    var i = FLOW.indexOf(id);
+    var prev = i > 0 ? FLOW[i - 1] : null;
+    var next = i < FLOW.length - 1 ? FLOW[i + 1] : null;
+    var left = prev ? '<a class="btn btn-sm" href="#' + prev + '">← ' + linkName(prev) + "</a>" : "<span></span>";
+    var right = next ? '<a class="btn btn-sm btn-primary" href="#' + next + '">' + linkName(next) + " →</a>" : "<span></span>";
+    return '<div class="flow-nav">' + left + right + "</div>";
   }
 
   /* =========================================================== DASHBOARD (A) */
@@ -255,7 +282,7 @@
     } else {
       body = data.dealers.map(dealerCard).join("");
     }
-    s.innerHTML = head + '<div id="dealer-list">' + body + "</div>";
+    s.innerHTML = head + '<div id="dealer-list">' + body + "</div>" + flowNav("dashboard");
 
     wireFinancing(s, updateComputed);
     $("#add-dealer").addEventListener("click", addDealer);
@@ -480,7 +507,7 @@
           field("After month #", '<input inputmode="numeric" id="calc-lumpm" value="' + attrNum(readTmp("lumpm")) + '" placeholder="12">') +
         "</div>" +
         '<div class="result" id="calc-lump-result" style="display:none"></div>' +
-      "</div>";
+      "</div>" + flowNav("calculator");
 
     wireFinancing(s, computeCalc);
     ["calc-price", "calc-fees", "calc-lump", "calc-lumpm"].forEach(function (id) {
@@ -573,7 +600,7 @@
         "</div>" +
         field("Target OTD (optional)", '<input id="tpl-target" inputmode="decimal" value="' + esc(data.ui.targetOtd) + '" placeholder="Your goal, e.g. 30000">') +
       "</div>" +
-      '<div id="tpl-list"></div>';
+      '<div id="tpl-list"></div>' + flowNav("templates");
 
     $("#tpl-name").addEventListener("input", function () { data.ui.myName = this.value; save(); renderTplList(); });
     $("#tpl-dealer").addEventListener("change", function () { data.ui.tplDealer = this.value; save(); renderTplList(); });
@@ -650,7 +677,7 @@
       '<div class="btn-row" style="margin-bottom:12px">' +
         '<span class="chip cat-fixed">Fixed</span><span class="chip cat-negotiable">Negotiable</span><span class="chip cat-fake">Fake</span>' +
       "</div>" +
-      '<div id="fee-list"></div>';
+      '<div id="fee-list"></div>' + flowNav("fees");
     $("#fee-search").addEventListener("input", function () { renderFeeList(this.value); });
     renderFeeList("");
   }
@@ -693,7 +720,7 @@
       '<div class="divider"></div>' +
       "<h2>What’s safe to share, and when</h2>" +
       '<p class="hint" style="margin-bottom:12px">Keep identity documents back until the price is locked in writing — ' +
-      "premature SSN/DL sharing invites a credit pull you didn’t authorize.</p>" + info;
+      "premature SSN/DL sharing invites a credit pull you didn’t authorize.</p>" + info + flowNav("guide");
   }
 
   /* ================================================================ DATA (H) */
@@ -714,7 +741,8 @@
         '<label class="btn" style="cursor:pointer">Choose file…<input type="file" id="import-file" accept="application/json,.json" style="display:none"></label></div></div>' +
       '<div class="card"><h3>Start over</h3>' +
         '<p class="hint">Delete every dealer and reset to defaults. This cannot be undone.</p>' +
-        '<button class="btn btn-danger btn-block" id="clear-btn">Clear all data</button></div>';
+        '<button class="btn btn-danger btn-block" id="clear-btn">Clear all data</button></div>' +
+      flowNav("data");
 
     $("#export-btn").addEventListener("click", exportData);
     $("#import-btn").addEventListener("click", function () { importFromText($("#import-text").value); });
@@ -777,7 +805,7 @@
     SECTIONS.forEach(function (s) {
       var sec = $("#section-" + s); if (sec) sec.classList.toggle("active", s === id);
     });
-    var links = document.querySelectorAll("#nav a");
+    var links = document.querySelectorAll("#drawer a");
     for (var i = 0; i < links.length; i++) {
       links[i].classList.toggle("active", links[i].getAttribute("href") === "#" + id);
     }
@@ -785,8 +813,26 @@
     // sections that depend on cross-section data are refreshed on entry
     if (id === "templates") renderTemplates();
     if (id === "dashboard") updateComputed();
+    setMenu(false);
     window.scrollTo(0, 0);
   }
+
+  /* --------------------------------------------------------- hamburger menu */
+  function menuOpen() { return $("#drawer").classList.contains("open"); }
+  function setMenu(open) {
+    var d = $("#drawer"), sc = $("#scrim"), btn = $("#menu-btn");
+    d.classList.toggle("open", open);
+    d.setAttribute("aria-hidden", open ? "false" : "true");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.classList.toggle("no-scroll", open);
+    if (open) { sc.hidden = false; requestAnimationFrame(function () { sc.classList.add("show"); }); }
+    else { sc.classList.remove("show"); setTimeout(function () { if (!menuOpen()) sc.hidden = true; }, 220); }
+  }
+  $("#menu-btn").addEventListener("click", function () { setMenu(!menuOpen()); });
+  $("#menu-close").addEventListener("click", function () { setMenu(false); });
+  $("#scrim").addEventListener("click", function () { setMenu(false); });
+  $("#drawer").addEventListener("click", function (e) { if (e.target.closest("a")) setMenu(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && menuOpen()) setMenu(false); });
 
   window.addEventListener("hashchange", route);
   renderAll();
