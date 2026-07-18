@@ -1,1 +1,62 @@
-# carbuddy
+# CarBuddy
+
+**Email-only, out-the-door car buying.** A calm, private toolkit that inverts the four
+things dealers rely on: it lets you negotiate *many dealers at once*, on *out-the-door
+price only*, *in writing*, with *every fee decoded*.
+
+Battle-tested during a real 2026 multi-dealer purchase run (Jacksonville, FL — 12+
+dealers, email-only, credit-union pre-approval, OTD-only comparison).
+
+## What's inside
+
+- **🧭 Playbook** — the 7-step process, in order, each step linking to the right tool.
+- **📋 Dealer dashboard** — itemized OTD ledger per dealer, fees tagged
+  Fixed / Negotiable / Fake, live monthly payment, lowest-OTD & lowest-payment
+  highlighting, notes + tactics log.
+- **🧮 Payment calculator** — amortization, 60/72/84 term comparison, and a lump-sum
+  payoff modeler (the "sell the old car later" scenario).
+- **✉️ Email templates** — 8 negotiation emails with merge fields auto-filled from your
+  dashboard, plus a "why it works" note on each. Copy or open in your mail app.
+- **🔍 Fee decoder** — 17-entry glossary: what each fee is, the honest range, whether
+  it's negotiable, and the exact sentence to send back.
+- **🚩 Field guide** — 12 dealer tactics with counter-moves, and a stage-by-stage
+  guide to what personal info is safe to share (so no premature credit pulls).
+
+## Privacy
+
+Everything lives in your browser's `localStorage` (key `carledger_v1`). There is no
+server, no account, and nothing is ever uploaded. Back up or move between devices with
+the JSON export/import on the **Data** tab.
+
+## Tech
+
+Vanilla HTML/CSS/JS. No build step, no framework, no dependencies. Seed content
+(templates, glossary, red flags, playbook) lives in `data/content.js` so copy can be
+edited without touching logic.
+
+```
+index.html        app shell + tab nav
+styles.css        calm/warm design system, mobile-first
+app.js            storage, finance math, all rendering
+data/content.js   seed content (editable copy)
+docs/             BRIEF · PLAN · SPEC · DECISIONS (the build methodology)
+```
+
+## Run it
+
+Open `index.html` in a browser, or serve the folder statically:
+
+```
+python3 -m http.server
+```
+
+## Deploy (GitHub Pages)
+
+Enable Pages for this repo with the source set to this branch's root. The site is fully
+static; the `docs/` markdown is ignored by the app.
+
+## Docs
+
+The product was built through an explicit Plan → Spec → Build loop:
+`docs/BRIEF.md` (intent) → `docs/PLAN.md` (order) → `docs/SPEC.md` (the source of truth,
+including formulas and acceptance criteria) → `docs/DECISIONS.md` (running log of choices).

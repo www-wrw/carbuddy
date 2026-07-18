@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CarBuddy — email-only, out-the-door car buying</title>
+  <meta name="description" content="A calm, private toolkit for buying a car the stress-free way: many dealers at once, out-the-door only, in writing, with every fee decoded. All data stays in your browser." />
+  <meta name="color-scheme" content="light" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9A%97%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">CarBuddy</span>
+        <span class="tag">email-only, out-the-door car buying</span>
+      </div>
+      <div class="privacy-note"><span class="dot"></span> Everything stays in your browser — nothing is ever uploaded.</div>
+    </header>
+
+    <nav class="nav" id="nav">
+      <a href="#playbook"><span class="ico">🧭</span>Playbook</a>
+      <a href="#dashboard"><span class="ico">📋</span>Dealers</a>
+      <a href="#calculator"><span class="ico">🧮</span>Calculator</a>
+      <a href="#templates"><span class="ico">✉️</span>Emails</a>
+      <a href="#fees"><span class="ico">🔍</span>Fees</a>
+      <a href="#guide"><span class="ico">🚩</span>Guide</a>
+      <a href="#data"><span class="ico">🔒</span>Data</a>
+    </nav>
+
+    <main id="main">
+      <section class="section" id="section-playbook"></section>
+      <section class="section" id="section-dashboard"></section>
+      <section class="section" id="section-calculator"></section>
+      <section class="section" id="section-templates"></section>
+      <section class="section" id="section-fees"></section>
+      <section class="section" id="section-guide"></section>
+      <section class="section" id="section-data"></section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="data/content.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
