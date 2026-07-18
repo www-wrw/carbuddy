@@ -14,6 +14,7 @@
         taxRate: 0, rollInFees: true, tradeInValue: 0
       },
       dealers: [],
+      progress: { steps: {} },  // playbook checklist: { [stepNumber]: true }
       ui: { activeSection: "playbook", myName: "", targetOtd: "", tplDealer: "" }
     };
   }
@@ -37,6 +38,8 @@
       var d = defaultData();
       blob.financing = Object.assign(d.financing, blob.financing || {});
       blob.ui = Object.assign(d.ui, blob.ui || {});
+      blob.progress = Object.assign(d.progress, blob.progress || {});
+      if (!blob.progress.steps || typeof blob.progress.steps !== "object") blob.progress.steps = {};
       if (!Array.isArray(blob.dealers)) blob.dealers = [];
       return blob;
     } catch (e) {
@@ -222,15 +225,26 @@
 
   /* ============================================================ PLAYBOOK (E) */
   function renderPlaybook() {
+    var doneMap = (data.progress && data.progress.steps) || {};
+    var total = C.playbook.length;
+    var done = 0; for (var k in doneMap) if (doneMap[k]) done++;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var allDone = done === total && total > 0;
+
     var steps = C.playbook.map(function (s) {
-      return '<a class="onb-step" href="#' + s.link + '">' +
-        '<div class="n num">' + s.n + "</div>" +
-        '<div class="onb-body">' +
-          '<div class="onb-title">' + esc(s.title) + "</div>" +
+      var isDone = !!doneMap[s.n];
+      return '<div class="tl-step' + (isDone ? " done" : "") + '">' +
+        '<button class="tl-node" data-toggle="' + s.n + '" role="checkbox" aria-checked="' +
+          (isDone ? "true" : "false") + '" aria-label="Mark “' + esc(s.title) + '” ' +
+          (isDone ? "not done" : "done") + '">' + (isDone ? "✓" : s.n) + "</button>" +
+        '<div class="tl-card">' +
+          '<div class="tl-title-row"><span class="onb-title">' + esc(s.title) + "</span>" +
+            (isDone ? '<span class="pill done-pill">Done</span>' : "") + "</div>" +
           '<div class="onb-desc">' + esc(s.body) + "</div>" +
-          '<div class="onb-go">' + linkName(s.link) + " →</div>" +
-        "</div></a>";
+          '<a class="onb-go" href="#' + s.link + '">' + linkName(s.link) + " →</a>" +
+        "</div></div>";
     }).join("");
+
     $("#section-playbook").innerHTML =
       '<div class="hero">' +
         "<h1>Buy your car<br>without the stress.</h1>" +
@@ -245,9 +259,16 @@
         "</div>" +
         '<a class="btn btn-primary btn-lg" href="#dashboard">Start — set up your dealers →</a>' +
       "</div>" +
-      '<h2 class="onb-h">Your 7-step playbook</h2>' +
-      '<p class="hint">Tap any step to jump to the tool for it. Or open the menu (☰) anytime.</p>' +
-      '<div class="onb-steps">' + steps + "</div>";
+      '<div class="progress-wrap">' +
+        '<div class="progress-head"><h2 class="onb-h" style="margin:0">Your 7-step playbook</h2>' +
+          '<span class="progress-count num">' + done + " / " + total + "</span></div>" +
+        '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+        (allDone
+          ? '<p class="progress-msg">🎉 Every step done — go get your car.</p>'
+          : '<p class="hint">Tick each step as you finish it. Your progress is saved on this device.</p>') +
+        (done > 0 ? '<button class="btn btn-sm btn-ghost" data-reset-progress>Reset checklist</button>' : "") +
+      "</div>" +
+      '<div class="tl">' + steps + "</div>";
   }
   function linkName(id) {
     return { playbook: "Home", dashboard: "Dealers", calculator: "Calculator",
@@ -776,6 +797,8 @@
       var d = defaultData();
       migrated.financing = Object.assign(d.financing, migrated.financing || {});
       migrated.ui = Object.assign(d.ui, migrated.ui || {});
+      migrated.progress = Object.assign(d.progress, migrated.progress || {});
+      if (!migrated.progress.steps || typeof migrated.progress.steps !== "object") migrated.progress.steps = {};
       if (!Array.isArray(migrated.dealers)) migrated.dealers = [];
       data = migrated; save(); renderAll(); toast("Restored " + data.dealers.length + " dealer(s)");
     } catch (e) {
@@ -828,6 +851,19 @@
     if (open) { sc.hidden = false; requestAnimationFrame(function () { sc.classList.add("show"); }); }
     else { sc.classList.remove("show"); setTimeout(function () { if (!menuOpen()) sc.hidden = true; }, 220); }
   }
+  // playbook checklist toggles (delegated once on the persistent section element)
+  $("#section-playbook").addEventListener("click", function (e) {
+    var tog = e.target.closest("[data-toggle]");
+    if (tog) {
+      var n = tog.getAttribute("data-toggle");
+      data.progress.steps[n] = !data.progress.steps[n];
+      save(); renderPlaybook(); return;
+    }
+    if (e.target.closest("[data-reset-progress]")) {
+      data.progress.steps = {}; save(); renderPlaybook();
+    }
+  });
+
   $("#menu-btn").addEventListener("click", function () { setMenu(!menuOpen()); });
   $("#menu-close").addEventListener("click", function () { setMenu(false); });
   $("#scrim").addEventListener("click", function () { setMenu(false); });
