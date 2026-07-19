@@ -158,6 +158,23 @@ Known residual limits (user reviews every field): split-logo dealership names ar
 captured; OCR may miss a character in a VIN; the flat tax-rate model differs slightly
 from FL's capped county surtax, so a computed OTD can be ~$100 off the quote's own total.
 
+## D15 — Reply helper: paste a dealer's message, get a suggested response
+Requested: a place to hold dealers' responses and see how to reply, with minimal effort.
+Since nothing leaves the browser (no LLM API), the advisor is heuristic, not generative:
+- `advise.js` `suggestReply(message, {hasLowerCompeting})` scans the dealer's message for
+  intent/tactic signals (phone push, come-in, name-a-number/monthly-payment anchoring,
+  fee itemization, "only good today", refusing to put it in writing, agreement, or a
+  given OTD) and returns the best-fit template id + detected red-flag ids + a one-line
+  reason. Priority order resolves multi-signal messages (holding the email boundary wins
+  over everything).
+- Per dealer card: a collapsible "Dealer replied?" box with a `lastReply` textarea
+  (persisted). On input it renders the detected tactics (with their counter-moves from
+  the red-flags list) and a ready-to-send reply — the mapped template pre-filled with the
+  dealer's merge fields (incl. competing OTD) — plus Copy / Open-in-email and "why it
+  works". `lastReply` is an additive field, default-empty for existing dealers.
+This reuses the existing template library + red-flags content, so the whole loop
+(their message → what to send back) is one paste and one click.
+
 ---
 
 ## Open questions still parked for the human

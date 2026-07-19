@@ -23,6 +23,9 @@ dealers, email-only, credit-union pre-approval, OTD-only comparison).
   payoff modeler (the "sell the old car later" scenario).
 - **✉️ Email templates** — 8 negotiation emails with merge fields auto-filled from your
   dashboard, plus a "why it works" note on each. Copy or open in your mail app.
+- **💬 Reply helper** — paste a dealer's response on their card and CarBuddy flags the
+  tactics it spots and hands you a ready-to-send reply (the right template, pre-filled),
+  so answering is one paste and one click.
 - **🔍 Fee decoder** — 17-entry glossary: what each fee is, the honest range, whether
   it's negotiable, and the exact sentence to send back.
 - **🚩 Field guide** — 12 dealer tactics with counter-moves, and a stage-by-stage

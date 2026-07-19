@@ -450,6 +450,7 @@
     wireImport();
     wireDealerList();
     updateComputed();
+    data.dealers.forEach(function (d) { renderReplyAnalysis(d.id); });
   }
 
   function wireImport() {
@@ -601,7 +602,7 @@
         })
       },
       listingUrl: p.listingUrl || "",
-      notes: "", tactics: [], createdAt: Date.now(), updatedAt: Date.now()
+      notes: "", tactics: [], lastReply: "", createdAt: Date.now(), updatedAt: Date.now()
     };
     data.dealers.push(d); save();
     var found = countFound(d);
@@ -680,6 +681,15 @@
       '<div class="pay-line"><span>Est. monthly</span><span class="money" id="pay-' + d.id + '"></span></div>' +
 
       '<div class="divider"></div>' +
+      '<details class="reply-helper"' + ((d.lastReply || "").trim() ? " open" : "") + ">" +
+        "<summary>💬 Dealer replied? Get a suggested response</summary>" +
+        '<div style="margin-top:8px">' +
+          field("Their message", '<textarea data-reply placeholder="Paste the dealer’s email or text reply here…">' + esc(d.lastReply || "") + "</textarea>") +
+          '<div class="reply-analysis" id="reply-' + d.id + '"></div>' +
+        "</div>" +
+      "</details>" +
+
+      '<div class="divider"></div>' +
       field("Notes &amp; tactics log", '<textarea data-df="notes" placeholder="“Pushed for a phone call,” “refused written quote,” “asked me to name a number”…">' + esc(d.notes) + "</textarea>") +
       '<details style="margin-top:8px"><summary class="hint">Log dealer tactics (' + (d.tactics || []).length + ' flagged)</summary><div style="margin-top:6px">' + tactics + "</div></details>" +
 
@@ -708,7 +718,7 @@
     data.dealers.push({
       id: uid("d_"), dealership: "", contact: "", status: "contacted",
       vehicle: { year: "", make: "", model: "", trim: "", color: "", vin: "", stock: "", mileage: "" },
-      quote: { salePrice: 0, fees: [] }, listingUrl: "", notes: "", tactics: [],
+      quote: { salePrice: 0, fees: [] }, listingUrl: "", notes: "", tactics: [], lastReply: "",
       createdAt: Date.now(), updatedAt: Date.now()
     });
     save(); renderDashboard();
@@ -784,6 +794,8 @@
       var id = t.getAttribute("data-tactic");
       d.tactics = (d.tactics || []).filter(function (x) { return x !== id; });
       if (t.checked) d.tactics.push(id);
+    } else if (t.hasAttribute("data-reply")) {
+      d.lastReply = t.value; touch(d); renderReplyAnalysis(d.id); return; // no recompute needed
     } else return;
 
     touch(d);
@@ -811,6 +823,47 @@
       card.classList.remove("highlight-otd");
       if (c.hasPrice && c.otd === minOtd) { badges.innerHTML += '<span class="badge">★ Lowest OTD</span>'; card.classList.add("highlight-otd"); }
       if (c.hasPrice && c.monthly === minPay) { badges.innerHTML += '<span class="badge badge-pay">Lowest payment</span>'; }
+    });
+  }
+
+  // Read a dealer's pasted reply → show detected tactics + a ready-to-send response.
+  function renderReplyAnalysis(id) {
+    var d = findDealer(id); if (!d) return;
+    var box = document.getElementById("reply-" + id); if (!box) return;
+    var msg = (d.lastReply || "").trim();
+    if (!msg) { box.innerHTML = '<p class="hint" style="margin-top:8px">Paste their reply and CarBuddy suggests exactly what to send back — pre-filled.</p>'; return; }
+    if (!window.CARBUDDY_ADVISE) { box.innerHTML = ""; return; }
+
+    var mine = dealerCalc(d), best = competingOtd(d.id);
+    var hasLower = mine.hasPrice ? (best < mine.otd) : (best < Infinity);
+    var s = window.CARBUDDY_ADVISE.suggestReply(msg, { hasLowerCompeting: hasLower });
+
+    var flags = (s.tacticIds || []).map(function (tid) {
+      var rf = findRedFlag(tid); if (!rf) return "";
+      return '<div class="flag"><div class="t">🚩 ' + esc(rf.tactic) + '</div><div class="c"><b>Counter:</b> ' + esc(rf.counter) + "</div></div>";
+    }).join("");
+
+    var tpl = getTpl(s.templateId), html = "";
+    if (flags) html += '<div style="margin-top:10px">' + flags + "</div>";
+    if (tpl) {
+      html += '<div class="reply-suggest">' +
+        '<div class="reply-lead">✍️ Send this back — <b>' + esc(tpl.title) + "</b></div>" +
+        (s.reason ? '<div class="hint" style="margin:4px 0 8px">' + esc(s.reason) + "</div>" : "") +
+        '<div class="tpl-body">' + esc(merge(tpl.body, contextForDealer(d))) + "</div>" +
+        '<div class="btn-row" style="margin-bottom:8px">' +
+          '<button class="btn btn-sm btn-primary" data-reply-copy>Copy reply</button>' +
+          '<button class="btn btn-sm" data-reply-mail>Open in email</button>' +
+        "</div>" +
+        '<div class="tpl-why"><b>Why it works:</b> ' + esc(tpl.why) + "</div>" +
+      "</div>";
+    }
+    box.innerHTML = html;
+    var cb = box.querySelector("[data-reply-copy]"), mb = box.querySelector("[data-reply-mail]");
+    if (cb) cb.addEventListener("click", function () { copyText(merge(getTpl(s.templateId).body, contextForDealer(d))); });
+    if (mb) mb.addEventListener("click", function () {
+      var c = contextForDealer(d), tt = getTpl(s.templateId);
+      var subj = tt.title + (c.vehicle ? " — " + c.vehicle : "");
+      window.location.href = "mailto:?subject=" + encodeURIComponent(subj) + "&body=" + encodeURIComponent(merge(tt.body, c));
     });
   }
 
@@ -938,25 +991,30 @@
     renderTplList();
   }
 
-  function tplContext() {
-    var d = findDealer(data.ui.tplDealer);
+  // lowest OTD among OTHER dealers with a price (Infinity if none)
+  function competingOtd(dealerId) {
+    var best = Infinity;
+    data.dealers.forEach(function (o) {
+      if (o.id === dealerId) return; var c = dealerCalc(o); if (c.hasPrice && c.otd < best) best = c.otd;
+    });
+    return best;
+  }
+  function contextForDealer(d) {
     var ctx = { my_name: data.ui.myName };
     if (d) {
       var v = d.vehicle;
       ctx.dealer = d.dealership;
       ctx.contact = d.contact;
       ctx.vehicle = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
-      // competing OTD = lowest OTD among OTHER dealers with a price
-      var best = Infinity;
-      data.dealers.forEach(function (o) {
-        if (o.id === d.id) return; var c = dealerCalc(o); if (c.hasPrice && c.otd < best) best = c.otd;
-      });
+      var best = competingOtd(d.id);
       if (best < Infinity) ctx.competing_OTD = money(best, 0);
     }
     var target = num(data.ui.targetOtd);
     if (target > 0) ctx.target_OTD = money(target, 0);
     return ctx;
   }
+  function tplContext() { return contextForDealer(findDealer(data.ui.tplDealer)); }
+  function findRedFlag(id) { for (var i = 0; i < C.redFlags.length; i++) if (C.redFlags[i].id === id) return C.redFlags[i]; return null; }
   function merge(body, ctx) {
     return body
       .replace(/{dealer}/g, ctx.dealer || "[dealer]")

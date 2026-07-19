@@ -285,6 +285,14 @@ button:active { transform: translateY(1px); }
 .flag .t { font-weight: 700; }
 .flag .c { font-size: .9rem; color: var(--ink-2); }
 
+/* --- Reply helper --- */
+.reply-helper > summary { cursor: pointer; font-weight: 650; color: var(--accent-ink); font-size: .9rem; list-style: none; }
+.reply-helper > summary::-webkit-details-marker { display: none; }
+.reply-helper > summary::before { content: "▸ "; color: var(--ink-3); }
+.reply-helper[open] > summary::before { content: "▾ "; }
+.reply-suggest { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 12px; margin-top: 10px; }
+.reply-lead { font-weight: 700; color: var(--accent-ink); }
+
 /* --- Empty states --- */
 .empty { text-align: center; color: var(--ink-3); padding: 30px 16px; }
 .empty .big { font-size: 2rem; margin-bottom: 6px; }
