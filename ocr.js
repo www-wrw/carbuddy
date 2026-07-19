@@ -45,19 +45,66 @@
     return tessReady;
   }
 
+  // Load a File/Blob into something drawable to a canvas.
+  function loadImage(src) {
+    if (src && src.getContext) return Promise.resolve(src);           // already a canvas
+    if (src && (src.naturalWidth || src.width) && src.tagName) return Promise.resolve(src); // <img>
+    if (root.createImageBitmap) return root.createImageBitmap(src);
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error("Could not decode image")); };
+      img.src = URL.createObjectURL(src);
+    });
+  }
+
+  // Upscale + grayscale + Otsu binarize — big accuracy win for OCR of printed quote forms.
+  function preprocess(source) {
+    var sw = source.width || source.naturalWidth, sh = source.height || source.naturalHeight;
+    if (!sw || !sh) return source;
+    var scale = sw < 1600 ? Math.min(3, 1600 / sw) : 1;
+    var w = Math.min(2800, Math.round(sw * scale)), h = Math.round(sh * (w / sw));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var ctx = c.getContext("2d");
+    ctx.drawImage(source, 0, 0, w, h);
+    var img, d;
+    try { img = ctx.getImageData(0, 0, w, h); d = img.data; } catch (e) { return c; }
+    var hist = new Array(256).fill(0), i, g, total = w * h;
+    for (i = 0; i < d.length; i += 4) {
+      g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+      d[i] = d[i + 1] = d[i + 2] = g; hist[g]++;
+    }
+    var sum = 0; for (i = 0; i < 256; i++) sum += i * hist[i];
+    var sumB = 0, wB = 0, wF = 0, maxVar = -1, thr = 127;
+    for (i = 0; i < 256; i++) {
+      wB += hist[i]; if (wB === 0) continue; wF = total - wB; if (wF === 0) break;
+      sumB += i * hist[i];
+      var mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > maxVar) { maxVar = between; thr = i; }
+    }
+    for (i = 0; i < d.length; i += 4) { var v = d[i] > thr ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = v; }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
   function ocrImage(imageLike, onProgress) {
-    return ensureTesseract().then(function () {
+    var canvasP = ensureTesseract().then(function () { return loadImage(imageLike); }).then(function (src) {
+      try { return preprocess(src); } catch (e) { return src; }
+    });
+    return canvasP.then(function (canvas) {
       return root.Tesseract.createWorker("eng", 1, {
         workerPath: abs("vendor/tesseract/worker.min.js"),
         corePath: abs("vendor/tesseract/"),   // directory → picks simd-lstm / lstm by SIMD support
         langPath: abs("vendor/tesseract/lang"),
         workerBlobURL: false,
         logger: function (m) { if (m && m.status && onProgress) onProgress(m.status, m.progress || 0); }
+      }).then(function (worker) {
+        return worker.setParameters({ user_defined_dpi: "300", preserve_interword_spaces: "1" })
+          .then(function () { return worker.recognize(canvas); })
+          .then(function (res) {
+            return worker.terminate().then(function () { return (res && res.data && res.data.text) || ""; });
+          }).catch(function (err) { worker.terminate(); throw err; });
       });
-    }).then(function (worker) {
-      return worker.recognize(imageLike).then(function (res) {
-        return worker.terminate().then(function () { return (res && res.data && res.data.text) || ""; });
-      }).catch(function (err) { worker.terminate(); throw err; });
     });
   }
 

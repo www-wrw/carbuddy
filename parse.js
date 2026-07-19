@@ -40,6 +40,10 @@
       label: "Market adjustment", category: "negotiable", taxable: true },
     { keys: ["destination charge", "destination", "freight"], label: "Destination", category: "fixed", taxable: true },
     { keys: ["advertising fee", "regional advertising", "advertising"], label: "Advertising fee", category: "negotiable", taxable: false },
+    { keys: ["private tag agency", "private tag agcy", "private tag", "tag agency", "tag agcy"],
+      label: "Private tag / e-filing", category: "fake", taxable: true },
+    { keys: ["fl tire fee", "tire fee", "tire recycling fee", "tire disposal fee"], label: "Tire fee", category: "fixed", taxable: false },
+    { keys: ["battery fee", "battery disposal fee"], label: "Battery fee", category: "fixed", taxable: false },
     // combined title+reg first, so it consumes the separate lines below
     { keys: ["title & registration", "title and registration", "title/registration", "title/reg",
       "tag & title", "tag and title", "title, tag", "tag/title"], label: "Title & registration",
@@ -195,17 +199,27 @@
   }
 
   function findContact(text) {
-    var m = text.match(/^\s*from:\s*([A-Za-z][A-Za-z.'-]+(?:\s+[A-Za-z][A-Za-z.'-]+){0,2})\s*(?:<|\(|$)/im);
+    var m = text.match(/^[ \t]*from:[ \t]*([A-Za-z][A-Za-z.'-]+(?:[ \t]+[A-Za-z][A-Za-z.'-]+){0,2})[ \t]*(?:<|\(|$)/im);
     if (m) return clean(m[1]);
-    m = text.match(/(?:sales\s*(?:person|man|consultant|rep(?:resentative)?|associate|manager)|your\s+(?:sales\s+)?(?:rep|consultant)|contact)\s*[:\-]?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2})/i);
+    m = text.match(/(?:sales\s*(?:person|man|consultant|rep(?:resentative)?|associate|manager)|your\s+(?:sales\s+)?(?:rep|consultant)|contact)[ \t]*[:\-]?[ \t]*([A-Z][a-zA-Z.'-]+(?:[ \t]+[A-Z][a-zA-Z.'-]+){0,2})/i);
     if (m) return clean(m[1]);
-    m = text.match(/(?:thanks|thank you|best|best regards|kind regards|regards|sincerely|cheers|warmly)[,!.]?\s*[\r\n]+\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,1})\s*(?:\n|$)/i);
+    m = text.match(/(?:thanks|thank you|best|best regards|kind regards|regards|sincerely|cheers|warmly)[,!.]?[ \t]*[\r\n]+[ \t]*([A-Z][a-zA-Z.'-]+(?:[ \t]+[A-Z][a-zA-Z.'-]+){0,1})[ \t]*(?:\n|$)/i);
     if (m) return clean(m[1]);
     return "";
   }
 
+  // Drop signature blocks & legal disclaimers — their prose (e.g. "electronic title
+  // registration fee and $1199 dealer delivery fee") otherwise gets mined as fake fees.
+  function stripBoilerplate(text) {
+    var markers = [/the numbers agreed/i, /\*\s*this charge includes/i, /this is not an offer/i,
+      /customer signature/i, /subject to final credit/i, /terms?\s*(?:and|&)\s*conditions/i];
+    var cut = text.length;
+    markers.forEach(function (re) { var m = text.search(re); if (m > 150 && m < cut) cut = m; });
+    return text.slice(0, cut);
+  }
+
   function parseQuote(text) {
-    text = String(text || "");
+    text = stripBoilerplate(String(text || ""));
     var out = { vehicle: findVehicle(text), fees: [] };
     out.dealership = findDealership(text);
     out.contact = findContact(text);

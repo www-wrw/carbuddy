@@ -141,6 +141,23 @@ This is also the honest answer to the deep-link limitation the user hit: marketp
 can't reliably take trim/model in a URL, so pasting the exact listing is the accurate
 path to the specific car. The Google search link remains the reliable outbound anchor.
 
+## D14 — OCR preprocessing + parser hardening (from a real quote)
+A real dealer quote photo (Atlantic Coast Honda) exposed weak spots. Fixes:
+- **Image preprocessing before OCR** (`ocr.js` `preprocess()`): upscale small images to
+  ~1600px, grayscale, then Otsu binarize; set Tesseract `user_defined_dpi=300` and
+  `preserve_interword_spaces`. This turned garbled amounts (`$1,199` → `51,1900`) into
+  accurate reads. Applied to both photos and rasterized PDF pages.
+- **Strip boilerplate** (`parse.js` `stripBoilerplate()`): dealer disclaimers contain
+  prose like "electronic title registration fee and $1199 dealer delivery fee" that was
+  being mined as phantom title/registration fees. We now cut everything from the first
+  signature/disclaimer marker before fee extraction.
+- **Name capture** no longer crosses line breaks (`[ \t]+` instead of `\s+`), so
+  "Salesperson: Jacobi Green\nPhone:" yields "Jacobi Green", not "Jacobi Green Phone".
+- New fee specs: private tag agency / e-filing (fake), tire fee, battery fee (fixed).
+Known residual limits (user reviews every field): split-logo dealership names aren't
+captured; OCR may miss a character in a VIN; the flat tax-rate model differs slightly
+from FL's capped county surtax, so a computed OTD can be ~$100 off the quote's own total.
+
 ---
 
 ## Open questions still parked for the human
