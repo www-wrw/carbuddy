@@ -10,6 +10,9 @@ dealers, email-only, credit-union pre-approval, OTD-only comparison).
 ## What's inside
 
 - **🧭 Playbook** — the 7-step process, in order, each step linking to the right tool.
+- **🚗 Find a car** — enter the exact make/model/trim + ZIP/radius/max mileage/price and
+  open prefilled searches on Google, Cars.com, Autotrader, TrueCar, Edmunds, and CarMax.
+  Your search stays in your browser until you click through to a marketplace.
 - **📋 Dealer dashboard** — itemized OTD ledger per dealer, fees tagged
   Fixed / Negotiable / Fake, live monthly payment, lowest-OTD & lowest-payment
   highlighting, notes + tactics log. **Import a quote** — drop in a photo, PDF,

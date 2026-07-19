@@ -95,6 +95,29 @@ PDFs, and chose the "on-device, self-contained" option. Implementation:
   choice; well under GitHub's per-file/repo limits and lazy-loaded so it never taxes
   first paint.
 
+## D11 — GitHub Pages Jekyll fix (`.nojekyll`)
+Symptom reported: "parsing feature is running into errors." All import paths (text,
+photo, text-PDF, scanned-PDF) passed locally over HTTP with zero console errors, which
+pointed to a deploy-time issue. GitHub Pages runs Jekyll by default, which can skip or
+mangle asset folders and unusual extensions (`.wasm.js`, `.gz`) — exactly the vendored
+OCR files. Added an empty `.nojekyll` at the repo root so Pages serves every file
+verbatim. Also hardened `handleParse` (never throws; on failure it surfaces a friendly
+message and still gives an editable card) and made the OCR failure message detect
+`file://` (workers can't run there) so a local-file user gets an accurate hint.
+
+## D12 — "Find a car" = prefilled-search launcher, not a live in-app feed
+Requested: find dealerships in a ZIP with an exact make/model/trim/mileage. A true
+in-app inventory feed is impossible under the locked architecture — it needs a backend
+and a paid/licensed dealer-inventory data source, and no free, CORS-enabled nationwide
+inventory API exists for a static site. The privacy-preserving, no-backend design that
+fits: a form (year/make/model/trim/ZIP/radius/max price/max mileage/condition) that
+builds **prefilled deep links** to Google, Cars.com, Autotrader, TrueCar, Edmunds, and
+CarMax. Nothing is sent anywhere until the user clicks through to a marketplace (stated
+in the UI). Deep-link formats are best-effort and may drift; the Google link is the
+reliable anchor and always carries the full query. Inputs persist in `ui.find`.
+A genuine in-app results feed remains a parked option that would require an explicit
+decision to add a backend + data license (out of the current locked scope).
+
 ---
 
 ## Open questions still parked for the human

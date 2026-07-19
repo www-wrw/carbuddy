@@ -271,8 +271,8 @@ window.CARBUDDY_CONTENT = (function () {
   const playbook = [
     { n: 1, title: "Get pre-approved first", link: "calculator",
       body: "Secure financing from your bank or credit union before you talk to any dealer. A pre-approval is your walking-around money and your APR benchmark — it turns the dealer's finance office from a trap into just another quote to beat." },
-    { n: 2, title: "Shortlist by your priorities", link: "dashboard",
-      body: "Decide the year/make/model/trim you actually want, and the must-haves. A tight shortlist keeps you from being upsold into a different car than the one you researched." },
+    { n: 2, title: "Shortlist by your priorities", link: "find",
+      body: "Decide the year/make/model/trim you actually want, and the must-haves. A tight shortlist keeps you from being upsold into a different car than the one you researched. Use Find a car to see what's in stock near you." },
     { n: 3, title: "Send the email blast", link: "templates",
       body: "Email every dealer within range the same initial OTD request. Many at once, in writing — this is the core inversion. Use the 'Initial out-the-door request' template." },
     { n: 4, title: "Collect quotes into the ledger", link: "dashboard",

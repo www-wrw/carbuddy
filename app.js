@@ -15,8 +15,14 @@
       },
       dealers: [],
       progress: { steps: {} },  // playbook checklist: { [stepNumber]: true }
-      ui: { activeSection: "playbook", myName: "", targetOtd: "", tplDealer: "" }
+      ui: {
+        activeSection: "playbook", myName: "", targetOtd: "", tplDealer: "",
+        find: { year: "", make: "", model: "", trim: "", zip: "", radius: "50", priceMax: "", mileageMax: "", condition: "all" }
+      }
     };
+  }
+  function defaultFind() {
+    return { year: "", make: "", model: "", trim: "", zip: "", radius: "50", priceMax: "", mileageMax: "", condition: "all" };
   }
 
   // Migration gate. Version is NEVER bumped without adding a branch here.
@@ -38,6 +44,7 @@
       var d = defaultData();
       blob.financing = Object.assign(d.financing, blob.financing || {});
       blob.ui = Object.assign(d.ui, blob.ui || {});
+      blob.ui.find = Object.assign(defaultFind(), blob.ui.find || {});
       blob.progress = Object.assign(d.progress, blob.progress || {});
       if (!blob.progress.steps || typeof blob.progress.steps !== "object") blob.progress.steps = {};
       if (!Array.isArray(blob.dealers)) blob.dealers = [];
@@ -271,12 +278,12 @@
       '<div class="tl">' + steps + "</div>";
   }
   function linkName(id) {
-    return { playbook: "Home", dashboard: "Dealers", calculator: "Calculator",
+    return { playbook: "Home", find: "Find a car", dashboard: "Dealers", calculator: "Calculator",
              templates: "Emails", fees: "Fee Decoder", guide: "Field Guide", data: "Your Data" }[id] || id;
   }
 
   // linear prev/next footer so the process flows without a persistent nav
-  var FLOW = ["playbook", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  var FLOW = ["playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
   function flowNav(id) {
     var i = FLOW.indexOf(id);
     var prev = i > 0 ? FLOW[i - 1] : null;
@@ -284,6 +291,119 @@
     var left = prev ? '<a class="btn btn-sm" href="#' + prev + '">← ' + linkName(prev) + "</a>" : "<span></span>";
     var right = next ? '<a class="btn btn-sm btn-primary" href="#' + next + '">' + linkName(next) + " →</a>" : "<span></span>";
     return '<div class="flow-nav">' + left + right + "</div>";
+  }
+
+  /* ============================================================ FIND A CAR */
+  function findSlug(s) { return String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+  function findCode(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9]+/g, ""); }
+  function findInt(v) { var n = parseInt(String(v).replace(/[^0-9]/g, ""), 10); return isFinite(n) ? n : 0; }
+
+  function buildFindLinks(q) {
+    var mk = (q.make || "").trim(), md = (q.model || "").trim(), tr = (q.trim || "").trim();
+    var yr = (q.year || "").trim(), zip = (q.zip || "").trim();
+    var r = findInt(q.radius) || 50, pMax = findInt(q.priceMax), mMax = findInt(q.mileageMax);
+    var cond = q.condition || "all";
+    var mkS = findSlug(mk), mdS = findSlug(md), mkC = findCode(mk), mdC = findCode(md);
+    var e = encodeURIComponent, links = [];
+
+    var gq = [yr, mk, md, tr, "for sale", zip ? "near " + zip : "",
+      pMax ? "under $" + pMax : "", mMax ? "under " + mMax + " miles" : ""].filter(Boolean).join(" ");
+    links.push({ name: "Google", url: "https://www.google.com/search?q=" + e(gq) });
+
+    links.push({ name: "Cars.com", url: "https://www.cars.com/shopping/results/?stock_type=" +
+      (cond === "new" ? "new" : cond === "used" ? "used" : "all") +
+      "&makes[]=" + e(mkS) + "&models[]=" + e(mkS + "-" + mdS) + "&maximum_distance=" + r +
+      (zip ? "&zip=" + e(zip) : "") + (pMax ? "&list_price_max=" + pMax : "") + (mMax ? "&mileage_max=" + mMax : "") });
+
+    links.push({ name: "Autotrader", url: "https://www.autotrader.com/cars-for-sale/all-cars?makeCodeList=" +
+      e(mkC) + "&modelCodeList=" + e(mdC) + (zip ? "&zip=" + e(zip) : "") + "&searchRadius=" + r +
+      (pMax ? "&maxPrice=" + pMax : "") + (mMax ? "&maxMileage=" + mMax : "") +
+      (cond === "used" ? "&listingTypes=USED" : cond === "new" ? "&listingTypes=NEW" : "") });
+
+    links.push({ name: "TrueCar", url: "https://www.truecar.com/" + (cond === "new" ? "new" : "used") +
+      "-cars-for-sale/listings/" + e(mkS) + "/" + e(mdS) + "/?" + (zip ? "zipcode=" + e(zip) + "&" : "") +
+      "searchRadius=" + r + (pMax ? "&priceHigh=" + pMax : "") + (mMax ? "&mileageHigh=" + mMax : "") });
+
+    links.push({ name: "Edmunds", url: "https://www.edmunds.com/inventory/srp.html?make=" + e(mkS) +
+      "&model=" + e(mkS + "|" + mdS) + (zip ? "&zip=" + e(zip) : "") + "&radius=" + r +
+      (pMax ? "&priceMax=" + pMax : "") + (mMax ? "&mileageMax=" + mMax : "") + (cond !== "all" ? "&inventorytype=" + cond : "") });
+
+    links.push({ name: "CarMax", url: "https://www.carmax.com/cars/" + e(mkS) + "/" + e(mdS) + (zip ? "?zip=" + e(zip) : "") });
+    return links;
+  }
+
+  function renderFind() {
+    var s = $("#section-find");
+    if (!data.ui.find) data.ui.find = defaultFind();
+    var f = data.ui.find;
+    var dealerOpts = '<option value="">— prefill from a saved dealer —</option>' + data.dealers.map(function (d) {
+      var v = d.vehicle; var label = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ") || d.dealership || "Unnamed";
+      return '<option value="' + d.id + '">' + esc(label) + "</option>";
+    }).join("");
+    var radiusOpts = [10, 25, 50, 100, 200, 500].map(function (n) {
+      return '<option value="' + n + '"' + (String(f.radius) === String(n) ? " selected" : "") + ">" + n + " mi</option>";
+    }).join("");
+    var condOpts = [["all", "New & used"], ["used", "Used only"], ["new", "New only"]].map(function (c) {
+      return '<option value="' + c[0] + '"' + (f.condition === c[0] ? " selected" : "") + ">" + c[1] + "</option>";
+    }).join("");
+
+    s.innerHTML =
+      "<h1>Find a car near you</h1>" +
+      '<p class="section-intro">Enter the exact car you want and your ZIP. CarBuddy builds prefilled searches ' +
+      "you can open on the big marketplaces — shortlist what’s in stock, then email those dealers with the " +
+      "playbook. Your search stays in your browser until you click through to a site.</p>" +
+      '<div class="card">' +
+        (data.dealers.length ? field("Prefill from a saved dealer", '<select id="find-prefill">' + dealerOpts + "</select>") : "") +
+        '<div class="grid-3">' +
+          field("Year", '<input id="find-year" inputmode="numeric" value="' + esc(f.year) + '" placeholder="Any">') +
+          field("Make", '<input id="find-make" value="' + esc(f.make) + '" placeholder="Toyota">') +
+          field("Model", '<input id="find-model" value="' + esc(f.model) + '" placeholder="RAV4">') +
+        "</div>" +
+        '<div class="grid-2">' +
+          field("Trim", '<input id="find-trim" value="' + esc(f.trim) + '" placeholder="XLE (optional)">') +
+          field("Condition", '<select id="find-condition">' + condOpts + "</select>") +
+        "</div>" +
+        '<div class="grid-3">' +
+          field("ZIP code", '<input id="find-zip" inputmode="numeric" value="' + esc(f.zip) + '" placeholder="32204">') +
+          field("Radius", '<select id="find-radius">' + radiusOpts + "</select>") +
+          field("Max price", '<input id="find-price" inputmode="numeric" value="' + esc(f.priceMax) + '" placeholder="Any">') +
+        "</div>" +
+        field("Max mileage", '<input id="find-mileage" inputmode="numeric" value="' + esc(f.mileageMax) + '" placeholder="Any">') +
+      "</div>" +
+      '<div id="find-links"></div>' + flowNav("find");
+
+    var fields = { "find-year": "year", "find-make": "make", "find-model": "model", "find-trim": "trim",
+      "find-zip": "zip", "find-radius": "radius", "find-price": "priceMax", "find-mileage": "mileageMax", "find-condition": "condition" };
+    Object.keys(fields).forEach(function (id) {
+      var el = $("#" + id); if (!el) return;
+      el.addEventListener("input", function () { data.ui.find[fields[id]] = el.value; save(); renderFindLinks(); });
+      el.addEventListener("change", function () { data.ui.find[fields[id]] = el.value; save(); renderFindLinks(); });
+    });
+    var pre = $("#find-prefill");
+    if (pre) pre.addEventListener("change", function () {
+      var d = findDealer(pre.value); if (!d) return;
+      var v = d.vehicle;
+      data.ui.find.year = v.year || ""; data.ui.find.make = v.make || "";
+      data.ui.find.model = v.model || ""; data.ui.find.trim = v.trim || "";
+      save(); renderFind();
+    });
+    renderFindLinks();
+  }
+
+  function renderFindLinks() {
+    var box = $("#find-links"); if (!box) return;
+    var f = data.ui.find;
+    if (!(f.make || "").trim() || !(f.model || "").trim()) {
+      box.innerHTML = '<div class="empty"><p>Enter at least a <b>make</b> and <b>model</b> to build searches.</p></div>';
+      return;
+    }
+    var links = buildFindLinks(f).map(function (l) {
+      return '<a class="btn" target="_blank" rel="noopener noreferrer" href="' + esc(l.url) + '">' + esc(l.name) + " ↗</a>";
+    }).join("");
+    box.innerHTML = '<div class="card"><h3>Open a prefilled search</h3>' +
+      '<p class="hint">Each opens on that marketplace in a new tab — the only point your search leaves your browser. ' +
+      "Deep links are best-effort (refine trim/options on the site); the <b>Google</b> link always works.</p>" +
+      '<div class="btn-row">' + links + "</div></div>";
   }
 
   /* =========================================================== DASHBOARD (A) */
@@ -358,7 +478,12 @@
           else setImportStatus("Couldn’t find readable text. Try a sharper, straight-on photo, or paste the text.");
         }).catch(function (err) {
           setImportBusy(false);
-          setImportStatus("Couldn’t read that file: " + ((err && err.message) || err));
+          var msg = (err && err.message) || String(err);
+          if (location.protocol === "file:") {
+            setImportStatus("Photo/PDF reading needs the hosted site (it can’t run from a local file). Open the deployed URL, or paste the text instead.");
+          } else {
+            setImportStatus("Couldn’t read that file: " + msg + ". You can paste the text instead.");
+          }
         });
       } else {
         var reader = new FileReader();
@@ -397,15 +522,25 @@
   function handleParse(text) {
     text = (text || "").trim();
     if (!text) { toast("Paste or choose a quote first."); return; }
-    if (looksJson(text)) {
-      try {
-        var obj = JSON.parse(text);
-        var dealerObj = obj && Array.isArray(obj.dealers) ? obj.dealers[0] : obj;
-        if (dealerObj && typeof dealerObj === "object") { addParsedDealer(fromJsonDealer(dealerObj)); return; }
-      } catch (e) { /* not valid JSON — fall through to text parsing */ }
+    try {
+      if (looksJson(text)) {
+        try {
+          var obj = JSON.parse(text);
+          var dealerObj = obj && Array.isArray(obj.dealers) ? obj.dealers[0] : obj;
+          if (dealerObj && typeof dealerObj === "object") { addParsedDealer(fromJsonDealer(dealerObj)); return; }
+        } catch (e) { /* not valid JSON — fall through to text parsing */ }
+      }
+      if (!window.CARBUDDY_PARSE) {
+        setImportStatus("Parser didn’t load. Reload the page and try again.");
+        addParsedDealer({}); // still give the user an editable card
+        return;
+      }
+      addParsedDealer(window.CARBUDDY_PARSE.parseQuote(text));
+    } catch (e) {
+      if (window.console) console.error("CarBuddy: parse failed", e);
+      setImportStatus("Couldn’t read that automatically — added a blank card to fill in.");
+      addParsedDealer({});
     }
-    if (!window.CARBUDDY_PARSE) { toast("Parser unavailable."); return; }
-    addParsedDealer(window.CARBUDDY_PARSE.parseQuote(text));
   }
 
   // map a CarBuddy-shaped dealer object (e.g. from an exported backup) to a parsed shape
@@ -950,6 +1085,7 @@
       var d = defaultData();
       migrated.financing = Object.assign(d.financing, migrated.financing || {});
       migrated.ui = Object.assign(d.ui, migrated.ui || {});
+      migrated.ui.find = Object.assign(defaultFind(), migrated.ui.find || {});
       migrated.progress = Object.assign(d.progress, migrated.progress || {});
       if (!migrated.progress.steps || typeof migrated.progress.steps !== "object") migrated.progress.steps = {};
       if (!Array.isArray(migrated.dealers)) migrated.dealers = [];
@@ -960,14 +1096,14 @@
   }
 
   /* -------------------------------------------------------------- rendering */
-  var SECTIONS = ["playbook", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  var SECTIONS = ["playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
   function renderAll() {
-    renderPlaybook(); renderDashboard(); renderCalculator();
+    renderPlaybook(); renderFind(); renderDashboard(); renderCalculator();
     renderTemplates(); renderFees(); renderGuide(); renderData();
     route();
   }
   var RENDERERS = {
-    playbook: renderPlaybook, dashboard: renderDashboard, calculator: renderCalculator,
+    playbook: renderPlaybook, find: renderFind, dashboard: renderDashboard, calculator: renderCalculator,
     templates: renderTemplates, fees: renderFees, guide: renderGuide, data: renderData
   };
   function renderActive() { var id = current(); if (RENDERERS[id]) RENDERERS[id](); }
