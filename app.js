@@ -418,17 +418,17 @@
         '<button class="btn" id="toggle-import">⬆ Import a quote</button>' +
       "</div>" +
       '<div class="card import-panel" id="import-panel" hidden>' +
-        "<h3>Import a dealer quote</h3>" +
-        '<p class="hint">Upload a <b>photo</b> or <b>PDF</b> of a quote, an email/<b>.txt</b>/<b>.eml</b>/<b>.csv</b>, ' +
-        "or a CarBuddy <b>.json</b> — or paste the text. Photos and PDFs are read with an on-device " +
-        "text reader: <b>the file never leaves your browser</b>. Reading is best-effort, so review the " +
-        "prefilled fields afterward.</p>" +
+        "<h3>Import a quote or listing</h3>" +
+        '<p class="hint">Paste a <b>listing URL</b> and CarBuddy pulls the car from it (paste the listing’s ' +
+        "page text too for price &amp; dealer). Or upload a <b>photo</b>/<b>PDF</b> of a quote, an " +
+        "email/<b>.txt</b>/<b>.eml</b>/<b>.csv</b>, or a CarBuddy <b>.json</b>. Everything is read " +
+        "<b>on your device</b> — nothing leaves your browser. Best-effort, so review the fields afterward.</p>" +
         '<div class="btn-row" style="margin-bottom:10px">' +
           '<label class="btn btn-sm" style="cursor:pointer">Choose file…' +
             '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,.pdf,image/*,application/pdf,text/*,message/rfc822" style="display:none"></label>' +
         "</div>" +
         '<div class="import-status" id="import-status" hidden></div>' +
-        '<textarea id="quote-text" placeholder="…or paste the dealer’s quote / email here"></textarea>' +
+        '<textarea id="quote-text" placeholder="Paste a listing URL, or the dealer’s quote / listing text / email…"></textarea>' +
         '<div class="btn-row" style="margin-top:8px">' +
           '<button class="btn btn-primary btn-sm" id="parse-quote">Parse &amp; add dealer</button>' +
           '<button class="btn btn-sm btn-ghost" id="cancel-import">Cancel</button>' +
@@ -518,6 +518,16 @@
   }
 
   function looksJson(t) { t = t.trim(); return t.charAt(0) === "{" || t.charAt(0) === "["; }
+  function firstUrl(t) { var m = String(t).match(/https?:\/\/[^\s"'<>)]+/i); return m ? m[0] : null; }
+  function mergeListing(base, u) {
+    base.vehicle = base.vehicle || {};
+    ["year", "make", "model", "trim", "vin", "stock", "mileage"].forEach(function (k) {
+      if (!base.vehicle[k] && u.vehicle[k]) base.vehicle[k] = u.vehicle[k];
+    });
+    if (!base.salePrice && u.salePrice) base.salePrice = u.salePrice;
+    base.listingUrl = u.listingUrl || base.listingUrl || "";
+    return base;
+  }
 
   function handleParse(text) {
     text = (text || "").trim();
@@ -535,7 +545,12 @@
         addParsedDealer({}); // still give the user an editable card
         return;
       }
-      addParsedDealer(window.CARBUDDY_PARSE.parseQuote(text));
+      var base = window.CARBUDDY_PARSE.parseQuote(text);
+      var url = firstUrl(text);
+      if (url && window.CARBUDDY_PARSE.parseListingUrl) {
+        base = mergeListing(base, window.CARBUDDY_PARSE.parseListingUrl(url));
+      }
+      addParsedDealer(base);
     } catch (e) {
       if (window.console) console.error("CarBuddy: parse failed", e);
       setImportStatus("Couldn’t read that automatically — added a blank card to fill in.");
@@ -570,11 +585,13 @@
   function addParsedDealer(p) {
     p = p || {};
     var pv = p.vehicle || {};
+    var hasQuote = num(p.salePrice) > 0 || (p.fees && p.fees.length);
     var d = {
-      id: uid("d_"), dealership: p.dealership || "", contact: p.contact || "", status: "quoted",
+      id: uid("d_"), dealership: p.dealership || "", contact: p.contact || "",
+      status: hasQuote ? "quoted" : "contacted",
       vehicle: {
         year: pv.year || "", make: pv.make || "", model: pv.model || "", trim: pv.trim || "",
-        color: pv.color || "", vin: pv.vin || "", stock: pv.stock || ""
+        color: pv.color || "", vin: pv.vin || "", stock: pv.stock || "", mileage: pv.mileage || ""
       },
       quote: {
         salePrice: num(p.salePrice) || 0,
@@ -583,6 +600,7 @@
                    category: f.category || "negotiable", taxable: f.taxable !== false };
         })
       },
+      listingUrl: p.listingUrl || "",
       notes: "", tactics: [], createdAt: Date.now(), updatedAt: Date.now()
     };
     data.dealers.push(d); save();
@@ -620,6 +638,7 @@
       '<div class="dealer-head"><div>' +
         '<div class="dealer-title">' + vehLine + "</div>" +
         (vehSub ? '<div class="dealer-sub">' + esc(vehSub) + "</div>" : "") +
+        (d.listingUrl ? '<div class="dealer-sub"><a href="' + esc(d.listingUrl) + '" target="_blank" rel="noopener noreferrer">View listing ↗</a></div>' : "") +
       "</div>" +
       '<span class="pill status-' + d.status + '" data-status-pill>' + statusLabel(d.status) + "</span>" +
       "</div>" +
@@ -640,10 +659,12 @@
         field("Color", '<input data-vf="color" value="' + esc(v.color) + '">') +
         field("Status", '<select data-df="status">' + statusOpts + "</select>") +
       "</div>" +
-      '<div class="grid-2">' +
+      '<div class="grid-3">' +
         field("VIN", '<input data-vf="vin" value="' + esc(v.vin) + '">') +
         field("Stock #", '<input data-vf="stock" value="' + esc(v.stock) + '">') +
+        field("Mileage", '<input data-vf="mileage" inputmode="numeric" value="' + esc(v.mileage || "") + '" placeholder="e.g. 12,000">') +
       "</div>" +
+      field("Listing URL", '<input data-df="listingUrl" value="' + esc(d.listingUrl || "") + '" placeholder="Paste a listing link (optional)">') +
 
       '<div class="divider"></div>' +
       "<h3>Fee ledger</h3>" +
@@ -686,8 +707,8 @@
   function addDealer() {
     data.dealers.push({
       id: uid("d_"), dealership: "", contact: "", status: "contacted",
-      vehicle: { year: "", make: "", model: "", trim: "", color: "", vin: "", stock: "" },
-      quote: { salePrice: 0, fees: [] }, notes: "", tactics: [],
+      vehicle: { year: "", make: "", model: "", trim: "", color: "", vin: "", stock: "", mileage: "" },
+      quote: { salePrice: 0, fees: [] }, listingUrl: "", notes: "", tactics: [],
       createdAt: Date.now(), updatedAt: Date.now()
     });
     save(); renderDashboard();

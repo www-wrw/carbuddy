@@ -50,7 +50,8 @@
   ];
 
   var SALE_KEYS = ["agreed sale price", "negotiated price", "sale price", "selling price",
-    "sales price", "vehicle price", "internet price", "e-price", "cash price", "unit price"];
+    "sales price", "vehicle price", "internet price", "e-price", "cash price", "unit price",
+    "list price", "listing price", "asking price", "our price", "sale/special price", "price"];
 
   function escRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
   function toNumber(s) {
@@ -101,7 +102,79 @@
     if (st) v.stock = st[1];
     var col = text.match(/\b(?:exterior(?:\s+colou?r)?|colou?r)\b\s*[:#-]?\s*([A-Za-z][A-Za-z ]{2,20}?)\s*(?:\n|,|;|\.|\||$)/i);
     if (col) v.color = clean(col[1]);
+    var mi = text.match(/\b([1-9][\d,]{2,6})\s*(?:mi|miles)\b/i) || text.match(/\b(?:mileage|odometer)\b\s*[:\-]?\s*([\d,]{3,})/i);
+    if (mi) { var mn = toNumber(mi[1]); if (mn >= 100 && mn < 1000000) v.mileage = String(mn); }
     return v;
+  }
+
+  // JSON-LD Vehicle/Car schema (present when a listing page's HTML source is pasted)
+  function parseJsonLd(text) {
+    var out = { vehicle: {} };
+    var re = /<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi, m;
+    while ((m = re.exec(text))) {
+      var json; try { json = JSON.parse(m[1].trim()); } catch (e) { continue; }
+      var nodes = Array.isArray(json) ? json : (json["@graph"] ? json["@graph"] : [json]);
+      nodes.forEach(function (n) {
+        if (!n || typeof n !== "object") return;
+        var t = String(n["@type"] || "").toLowerCase();
+        if (t.indexOf("car") < 0 && t.indexOf("vehicle") < 0 && t.indexOf("product") < 0) return;
+        if (n.vehicleIdentificationNumber) out.vehicle.vin = String(n.vehicleIdentificationNumber).toUpperCase();
+        var yr = n.modelDate || n.vehicleModelDate || n.productionDate;
+        if (yr) out.vehicle.year = String(yr).slice(0, 4);
+        if (n.brand) out.vehicle.make = String(n.brand.name || n.brand);
+        if (n.model) out.vehicle.model = String(n.model.name || n.model);
+        if (n.vehicleConfiguration || n.trim) out.vehicle.trim = String(n.vehicleConfiguration || n.trim);
+        if (n.mileageFromOdometer != null) {
+          var mo = n.mileageFromOdometer; out.vehicle.mileage = String(toNumber(mo.value != null ? mo.value : mo));
+        }
+        var offers = n.offers ? (Array.isArray(n.offers) ? n.offers[0] : n.offers) : null;
+        if (offers && offers.price) out.salePrice = toNumber(offers.price);
+        if (offers && offers.seller && offers.seller.name) out.dealership = String(offers.seller.name);
+        if (!out.dealership && n.seller && n.seller.name) out.dealership = String(n.seller.name);
+      });
+    }
+    return out;
+  }
+
+  // Parse whatever is encoded in a listing URL itself (no network — works offline & private).
+  // Dealer-site listing URLs usually carry year/make/model/trim + VIN in the path.
+  function parseListingUrl(url) {
+    var out = { vehicle: {}, listingUrl: url };
+    var u = null; try { u = new URL(url); } catch (e) { /* not a full URL */ }
+    var raw; try { raw = decodeURIComponent(url); } catch (e) { raw = url; }
+    var pathText = ((u ? u.pathname : raw)).replace(/[-_+/.]+/g, " ")
+      .replace(/\b(html?|xhtml|aspx?|php|jsp)\b/gi, " ");
+
+    var vin = url.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+    if (vin && /[A-Za-z]/.test(vin[1]) && /[0-9]/.test(vin[1])) out.vehicle.vin = vin[1].toUpperCase();
+
+    var v = findVehicle(pathText);
+    ["year", "make", "model", "trim", "stock", "mileage"].forEach(function (k) { if (v[k]) out.vehicle[k] = v[k]; });
+
+    // URL slugs are lowercase; recase and strip VIN / listing-id noise from the trim.
+    function casePart(tok) {
+      return (/\d/.test(tok) || tok.length <= 3) ? tok.toUpperCase()
+        : tok.charAt(0).toUpperCase() + tok.slice(1).toLowerCase();
+    }
+    if (out.vehicle.model) out.vehicle.model = out.vehicle.model.split(/\s+/).map(casePart).join(" ");
+    if (out.vehicle.trim) {
+      out.vehicle.trim = out.vehicle.trim.split(/\s+/).filter(function (t) {
+        if (!t) return false;
+        if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(t)) return false;          // VIN
+        if (/^\d{5,}$/.test(t)) return false;                        // listing id
+        if (out.vehicle.stock && t === out.vehicle.stock) return false;
+        return true;
+      }).slice(0, 3).map(casePart).join(" ");
+    }
+
+    if (u) {
+      u.searchParams.forEach(function (val, key) {
+        if (!out.salePrice && /price/i.test(key)) { var n = toNumber(val); if (n > 1000) out.salePrice = n; }
+        if (!out.vehicle.mileage && /mile|odom/i.test(key)) { var n2 = toNumber(val); if (n2 >= 100) out.vehicle.mileage = String(n2); }
+      });
+      out.host = u.hostname.replace(/^www\./, "");
+    }
+    return out;
   }
 
   function findDealership(text) {
@@ -148,10 +221,20 @@
         if (spec.provides) provided[spec.provides] = true;
       }
     });
+
+    // If listing HTML source was pasted, let structured JSON-LD fill any gaps.
+    if (/application\/ld\+json/i.test(text)) {
+      var ld = parseJsonLd(text);
+      ["year", "make", "model", "trim", "vin", "mileage"].forEach(function (k) {
+        if (ld.vehicle[k] && !out.vehicle[k]) out.vehicle[k] = ld.vehicle[k];
+      });
+      if (ld.salePrice && !out.salePrice) out.salePrice = ld.salePrice;
+      if (ld.dealership && !out.dealership) out.dealership = ld.dealership;
+    }
     return out;
   }
 
-  var api = { parseQuote: parseQuote };
+  var api = { parseQuote: parseQuote, parseListingUrl: parseListingUrl };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.CARBUDDY_PARSE = api;
 })(typeof window !== "undefined" ? window : this);

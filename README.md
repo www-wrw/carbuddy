@@ -15,8 +15,9 @@ dealers, email-only, credit-union pre-approval, OTD-only comparison).
   Your search stays in your browser until you click through to a marketplace.
 - **📋 Dealer dashboard** — itemized OTD ledger per dealer, fees tagged
   Fixed / Negotiable / Fake, live monthly payment, lowest-OTD & lowest-payment
-  highlighting, notes + tactics log. **Import a quote** — drop in a photo, PDF,
-  email, or `.txt`/`.csv`/`.json` and the dealer/vehicle/price/fees are prefilled,
+  highlighting, notes + tactics log. **Import a quote or listing** — paste a
+  listing URL (the car is pulled from it), or drop in a photo, PDF, email, or
+  `.txt`/`.csv`/`.json`, and the dealer/vehicle/price/fees/mileage are prefilled,
   read entirely on-device (OCR for photos & scanned PDFs; nothing is uploaded).
 - **🧮 Payment calculator** — amortization, 60/72/84 term comparison, and a lump-sum
   payoff modeler (the "sell the old car later" scenario).

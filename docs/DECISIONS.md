@@ -118,6 +118,29 @@ reliable anchor and always carries the full query. Inputs persist in `ui.find`.
 A genuine in-app results feed remains a parked option that would require an explicit
 decision to add a backend + data license (out of the current locked scope).
 
+## D13 — Add a dealer from a listing URL (parsed client-side)
+Requested: paste a listing URL and have the car parsed in as a potential dealer to
+contact. Fetching the listing page to read price/mileage/dealer would require a
+CORS proxy or backend — both send the page/URL off-device and break the privacy pitch —
+so we don't fetch. Instead:
+- `parse.js` gains `parseListingUrl(url)`, which reads only what the URL string itself
+  encodes. Dealer-site listing URLs (DealerOn/Dealer.com/DealerInspire, etc.) almost
+  always carry `year-make-model-trim` plus the VIN in the path; we de-slug the path,
+  reuse the vehicle finder, recase model/trim, strip VIN/listing-id noise from trim, and
+  read `price`/`mileage` from query params where present. Aggregator URLs (Cars.com,
+  Autotrader) are often opaque IDs, so they yield less — that's expected.
+- The import box now detects a URL in the pasted text: it runs the normal text parser
+  AND the URL parser, merging them (paste the listing's page text alongside the URL to
+  also capture price, dealer, and fees — the visible text carries those, and pasted HTML
+  source is mined for JSON-LD Vehicle schema as a bonus).
+- New per-dealer fields: `listingUrl` (shown as a "View listing ↗" link + editable field)
+  and `vehicle.mileage`. Both additive; existing dealers default them empty on load.
+- URL-only imports (no price/fees) land as status "contacted" (a lead to contact), vs.
+  "quoted" when a price/fees were found.
+This is also the honest answer to the deep-link limitation the user hit: marketplaces
+can't reliably take trim/model in a URL, so pasting the exact listing is the accurate
+path to the specific car. The Google search link remains the reliable outbound anchor.
+
 ---
 
 ## Open questions still parked for the human
