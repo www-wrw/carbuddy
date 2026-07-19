@@ -237,6 +237,23 @@ Per user feedback after using the guide hub:
   the small wordmark + hamburger; the tagline and privacy line stay on Home, which
   remains the branded surface.
 
+## D19 — Frosted-glass restyle (warm glassmorphism)
+User shared reference shots (modern health-app UI + frosted/clear/blur comparison) and
+asked for "more modern with frosted buttons but still warm." Implementation, CSS-only:
+- Warm ambient glow: fixed radial-gradient layer (peach/sage/apricot) behind the page
+  and onboarding, so translucent surfaces have something to frost over.
+- Frosted chrome via `backdrop-filter`: topbar, drawer, modals, scrims (light blur),
+  toast, hamburger, and secondary buttons (now pill-shaped, translucent white).
+  Primary buttons stay solid sage for contrast, now with a soft colored shadow.
+- Bottom nav became a floating frosted pill (detached, rounded-full, active tab on a
+  white pill) matching the reference.
+- Cards/inputs switched to translucent surfaces with light glass edges
+  (`--glass-edge`), radii bumped (20/13), shadows softened. `backdrop-filter` is
+  deliberately NOT applied to every card — long dealer lists would jank on low-end
+  phones; translucency over the fixed glow gives the effect at no per-card cost.
+- Palette unchanged (warm neutrals + sage); soft tints converted to rgba so they sit
+  on glass.
+
 ---
 
 ## Open questions still parked for the human
