@@ -159,6 +159,15 @@ a.onb-go:hover { text-decoration: underline; }
 .dealer-card.flash { animation: flash 1.5s ease; }
 @keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent), var(--shadow); } 100% { box-shadow: var(--shadow); } }
 .import-panel { border-color: var(--line-2); background: var(--surface-2); }
+.import-status { font-size: .82rem; font-weight: 600; color: var(--accent-ink);
+  background: var(--accent-soft); border-radius: var(--radius-sm); padding: 9px 11px; margin-bottom: 10px; }
+.import-panel.busy .import-status { position: relative; padding-left: 30px; }
+.import-panel.busy .import-status::before {
+  content: ""; position: absolute; left: 11px; top: 50%; width: 13px; height: 13px; margin-top: -7px;
+  border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* --- Forms --- */
 label { display: block; font-size: .8rem; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }

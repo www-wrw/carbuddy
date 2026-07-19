@@ -299,13 +299,15 @@
       "</div>" +
       '<div class="card import-panel" id="import-panel" hidden>' +
         "<h3>Import a dealer quote</h3>" +
-        '<p class="hint">Upload or paste a quote — email text, <b>.txt</b>, <b>.eml</b>, <b>.csv</b>, ' +
-        "or a CarBuddy <b>.json</b>. It’s read <b>on your device</b>; the file never leaves your browser. " +
-        "Parsing is best-effort, so review the prefilled fields afterward.</p>" +
+        '<p class="hint">Upload a <b>photo</b> or <b>PDF</b> of a quote, an email/<b>.txt</b>/<b>.eml</b>/<b>.csv</b>, ' +
+        "or a CarBuddy <b>.json</b> — or paste the text. Photos and PDFs are read with an on-device " +
+        "text reader: <b>the file never leaves your browser</b>. Reading is best-effort, so review the " +
+        "prefilled fields afterward.</p>" +
         '<div class="btn-row" style="margin-bottom:10px">' +
           '<label class="btn btn-sm" style="cursor:pointer">Choose file…' +
-            '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,text/*,message/rfc822" style="display:none"></label>' +
+            '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,.pdf,image/*,application/pdf,text/*,message/rfc822" style="display:none"></label>' +
         "</div>" +
+        '<div class="import-status" id="import-status" hidden></div>' +
         '<textarea id="quote-text" placeholder="…or paste the dealer’s quote / email here"></textarea>' +
         '<div class="btn-row" style="margin-top:8px">' +
           '<button class="btn btn-primary btn-sm" id="parse-quote">Parse &amp; add dealer</button>' +
@@ -336,16 +338,58 @@
       panel.hidden = !panel.hidden;
       if (!panel.hidden) { panel.scrollIntoView({ block: "nearest" }); $("#quote-text").focus(); }
     });
-    $("#cancel-import").addEventListener("click", function () { panel.hidden = true; $("#quote-text").value = ""; });
+    $("#cancel-import").addEventListener("click", function () {
+      panel.hidden = true; $("#quote-text").value = ""; setImportStatus("");
+    });
     $("#quote-file").addEventListener("change", function (e) {
       var f = e.target.files[0]; if (!f) return;
-      var reader = new FileReader();
-      reader.onload = function () { $("#quote-text").value = String(reader.result || ""); toast("Loaded “" + f.name + "”"); };
-      reader.onerror = function () { toast("Couldn’t read that file."); };
-      reader.readAsText(f);
       e.target.value = ""; // allow re-choosing the same file
+
+      if (window.CARBUDDY_OCR && window.CARBUDDY_OCR.isOcrFile(f)) {
+        var kind = window.CARBUDDY_OCR.kindOf(f);
+        setImportBusy(true);
+        setImportStatus("Preparing the on-device reader… the first photo/PDF import loads it (a few MB, one time).");
+        window.CARBUDDY_OCR.extractText(f, function (status, progress) {
+          setImportStatus(prettyOcrStatus(status, progress));
+        }).then(function (text) {
+          setImportBusy(false);
+          $("#quote-text").value = text || "";
+          if (text && text.trim()) setImportStatus("✓ Text read from " + (kind === "pdf" ? "PDF" : "photo") + " — review it below, then Parse & add.");
+          else setImportStatus("Couldn’t find readable text. Try a sharper, straight-on photo, or paste the text.");
+        }).catch(function (err) {
+          setImportBusy(false);
+          setImportStatus("Couldn’t read that file: " + ((err && err.message) || err));
+        });
+      } else {
+        var reader = new FileReader();
+        reader.onload = function () { $("#quote-text").value = String(reader.result || ""); setImportStatus("✓ Loaded “" + f.name + "” — review and Parse & add."); };
+        reader.onerror = function () { setImportStatus("Couldn’t read that file."); };
+        reader.readAsText(f);
+      }
     });
     $("#parse-quote").addEventListener("click", function () { handleParse($("#quote-text").value); });
+  }
+
+  function setImportStatus(msg) {
+    var el = $("#import-status"); if (!el) return;
+    el.textContent = msg || ""; el.hidden = !msg;
+  }
+  function setImportBusy(busy) {
+    var p = $("#parse-quote"), f = $("#quote-file");
+    if (p) p.disabled = busy;
+    if (f) f.disabled = busy;
+    var panel = $("#import-panel");
+    if (panel) panel.classList.toggle("busy", busy);
+  }
+  function prettyOcrStatus(status, progress) {
+    var pct = Math.round((progress || 0) * 100);
+    if (/recognizing/i.test(status)) return "Reading text… " + pct + "%";
+    if (/core/i.test(status)) return "Loading reader…";
+    if (/language|traineddata/i.test(status)) return "Loading language data…";
+    if (/initiali/i.test(status)) return "Getting ready…";
+    if (/reading pdf/i.test(status)) return "Reading PDF text… " + pct + "%";
+    if (/ocr pdf/i.test(status)) return "Reading " + status.replace("ocr pdf page", "PDF page") + "… " + pct + "%";
+    return status.charAt(0).toUpperCase() + status.slice(1) + "… " + pct + "%";
   }
 
   function looksJson(t) { t = t.trim(); return t.charAt(0) === "{" || t.charAt(0) === "["; }

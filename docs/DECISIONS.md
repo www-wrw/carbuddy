@@ -74,12 +74,31 @@ no-dependency, no-build architecture). The UI states parsing is local and best-e
 and every imported field lands in an editable card for the user to verify. Imported
 dealers default to status "quoted".
 
+## D10 — Photo & PDF quote import via on-device OCR (self-contained)
+Resolves the D9 caveat. The human confirmed the audience sends a mix of photos and
+PDFs, and chose the "on-device, self-contained" option. Implementation:
+- `ocr.js` lazily loads vendored **pdf.js** (PDF text extraction + page rasterization)
+  and **Tesseract.js** (OCR for photos and scanned PDFs). Text-based PDFs use pdf.js's
+  text layer; if a PDF has no real text (scanned), pages are rendered to a canvas and
+  OCR'd. Images always go through OCR. Output feeds the existing `parse.js` heuristics.
+- Libraries are **vendored** under `/vendor` (~12 MB total) and loaded **only on first
+  photo/PDF import** — zero bytes on initial page load (verified). This keeps the locked
+  privacy promise: nothing is uploaded, and it works offline. No CDN, no build step —
+  files were obtained with `npm pack` (jsDelivr is blocked by the sandbox proxy anyway).
+- Tesseract core: both SIMD and non-SIMD LSTM cores are vendored so `getCore` auto-picks
+  by browser capability; the `.wasm.js` cores embed their wasm as base64 (no sibling
+  `.wasm` fetch). Language: `eng` tessdata_best (4.0.0), gz-compressed.
+- Web workers require an http(s) origin, so OCR won't run from `file://`; that's fine for
+  GitHub Pages. Import UI shows live progress ("Reading text… 45%") and states plainly
+  that reading happens on-device. Every field still lands editable for review.
+- Footprint (~12 MB of binaries in-repo) is the accepted cost of the self-contained
+  choice; well under GitHub's per-file/repo limits and lazy-loaded so it never taxes
+  first paint.
+
 ---
 
 ## Open questions still parked for the human
 - Custom domain later? (D2 chose github.io subpath for now.)
 - Any monetization in v2? (D4 says no for v1.)
 - Additional state tax/registration presets beyond the seed set — add as users request.
-- Quote import is text-only by design (D9). If PDF/photo import becomes a must-have,
-  it needs an explicit privacy decision (bundle a client-side library, or accept an
-  optional external OCR with clear consent).
+- OCR language is English only (D10). Add more tessdata files if non-English quotes matter.

@@ -12,7 +12,9 @@ dealers, email-only, credit-union pre-approval, OTD-only comparison).
 - **🧭 Playbook** — the 7-step process, in order, each step linking to the right tool.
 - **📋 Dealer dashboard** — itemized OTD ledger per dealer, fees tagged
   Fixed / Negotiable / Fake, live monthly payment, lowest-OTD & lowest-payment
-  highlighting, notes + tactics log.
+  highlighting, notes + tactics log. **Import a quote** — drop in a photo, PDF,
+  email, or `.txt`/`.csv`/`.json` and the dealer/vehicle/price/fees are prefilled,
+  read entirely on-device (OCR for photos & scanned PDFs; nothing is uploaded).
 - **🧮 Payment calculator** — amortization, 60/72/84 term comparison, and a lump-sum
   payoff modeler (the "sell the old car later" scenario).
 - **✉️ Email templates** — 8 negotiation emails with merge fields auto-filled from your
@@ -35,10 +37,13 @@ Vanilla HTML/CSS/JS. No build step, no framework, no dependencies. Seed content
 edited without touching logic.
 
 ```
-index.html        app shell + tab nav
+index.html        app shell + hamburger nav
 styles.css        calm/warm design system, mobile-first
 app.js            storage, finance math, all rendering
+parse.js          heuristic quote-text → dealer-fields parser
+ocr.js            on-demand photo/PDF text extraction (lazy-loads vendor libs)
 data/content.js   seed content (editable copy)
+vendor/           pdf.js + Tesseract.js, vendored & loaded only on photo/PDF import
 docs/             BRIEF · PLAN · SPEC · DECISIONS (the build methodology)
 ```
 
