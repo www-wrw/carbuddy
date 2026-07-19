@@ -244,6 +244,7 @@ button, .btn {
   color: var(--ink); border-radius: 999px; padding: 10px 16px;
   box-shadow: 0 1px 3px rgba(84, 66, 45, 0.07);
   display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+  text-decoration: none;
 }
 button:active { transform: translateY(1px); }
 .btn-primary { background: var(--accent); border-color: rgba(255,255,255,.35); color: #fff;
@@ -342,8 +343,22 @@ button:active { transform: translateY(1px); }
 .home-sec-head h2 { margin: 0; }
 .mini-list { display: flex; flex-direction: column; gap: 10px; }
 .mini-card { display: flex; justify-content: space-between; gap: 12px; padding: 13px 14px;
-  text-decoration: none; color: inherit; margin-bottom: 0; }
-.mini-card:hover { border-color: var(--accent); }
+  text-decoration: none; color: inherit; margin-bottom: 0;
+  background: rgba(255, 253, 250, 0.5);
+  transition: background .15s ease, box-shadow .15s ease, transform .1s ease; }
+
+/* tappable-card states, matched to the frosted look (no accent outlines, no sticky hover) */
+.tile, .progress-card { transition: background .15s ease, box-shadow .15s ease, transform .1s ease; }
+@media (hover: hover) {
+  .mini-card:hover, .tile:hover, .progress-card:hover {
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8px 26px rgba(84, 66, 45, 0.14);
+  }
+}
+.mini-card:active, .tile:active, .progress-card:active {
+  transform: scale(0.985);
+  background: rgba(255, 255, 255, 0.85);
+}
 .mini-main { min-width: 0; flex: 1; }
 .mini-title { font-weight: 700; }
 .mini-sub { font-size: .8rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -356,7 +371,6 @@ button:active { transform: translateY(1px); }
 .empty-line { color: var(--ink-3); font-size: .9rem; background: var(--surface-2);
   border: 1px dashed var(--line-2); border-radius: var(--radius-sm); padding: 14px; }
 .progress-card { display: block; text-decoration: none; color: inherit; }
-.progress-card:hover { border-color: var(--accent); }
 
 /* --- Dealer detail --- */
 .detail-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
@@ -416,7 +430,6 @@ button:active { transform: translateY(1px); }
 .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left;
   background: var(--surface); border: 1px solid var(--glass-edge); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 15px 14px; cursor: pointer; text-decoration: none; color: inherit; font: inherit; }
-.tile:hover { border-color: var(--accent); }
 .tile-ico { font-size: 1.5rem; }
 .tile-t { font-weight: 700; }
 .tile-d { font-size: .78rem; color: var(--ink-3); font-weight: 500; }

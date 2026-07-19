@@ -334,8 +334,8 @@
 
       '<div class="btn-row" style="margin:4px 0 18px">' +
         '<button class="btn btn-sm" data-home-add>+ Add dealer</button>' +
-        '<button class="btn btn-sm" data-home-import>⬆ Import quote</button>' +
-        '<a class="btn btn-sm" href="#find">🔍 Find a car</a>' +
+        '<button class="btn btn-sm" data-home-import>Import quote</button>' +
+        '<a class="btn btn-sm" href="#find">Find a car</a>' +
       "</div>" +
 
       '<div class="home-sec-head"><h2>Your offers</h2>' +
@@ -465,7 +465,7 @@
           field("Max price", '<input id="find-price" inputmode="numeric" value="' + esc(f.priceMax) + '" placeholder="Any">') +
         "</div>" +
         field("Max mileage", '<input id="find-mileage" inputmode="numeric" value="' + esc(f.mileageMax) + '" placeholder="Any">') +
-        '<button class="btn btn-block" id="find-save-car">💾 Save this car to my list</button>' +
+        '<button class="btn btn-block" id="find-save-car">Save this car to my list</button>' +
         '<p class="hint" style="margin-top:6px">Saves it under “Your saved cars” on Home, ready to attach a dealer and quote later.</p>' +
       "</div>" +
       '<div id="find-links"></div>' + flowNav("find");
@@ -585,6 +585,43 @@
     $("#am-dealership").focus();
   }
 
+  // Cars tab: add a car you're eyeing — no dealer attached yet
+  function openAddCarModal() {
+    openModal(modalHead("Add a car") +
+      '<p class="hint">Just the car you’re eyeing — you’ll attach a dealer and quote when one comes in.</p>' +
+      '<div class="grid-3">' +
+        field("Year", '<input id="ac-year" inputmode="numeric" placeholder="2026">') +
+        field("Make", '<input id="ac-make" placeholder="Toyota">') +
+        field("Model", '<input id="ac-model" placeholder="RAV4">') +
+      "</div>" +
+      '<div class="grid-2">' +
+        field("Trim", '<input id="ac-trim" placeholder="Optional">') +
+        field("Color", '<input id="ac-color" placeholder="Optional">') +
+      "</div>" +
+      field("Max mileage you’d accept", '<input id="ac-miles" inputmode="numeric" placeholder="Optional">') +
+      '<div class="btn-row" style="margin-top:6px">' +
+        '<button class="btn btn-primary" id="ac-save">Add car</button>' +
+        '<button class="btn btn-ghost" data-modal-close>Cancel</button>' +
+      "</div>");
+    $("#ac-save").addEventListener("click", function () {
+      var make = $("#ac-make").value.trim(), model = $("#ac-model").value.trim();
+      if (!make && !model) { toast("Give it at least a make or model."); return; }
+      var d = newDealer();
+      d.vehicle.year = $("#ac-year").value.trim();
+      d.vehicle.make = make;
+      d.vehicle.model = model;
+      d.vehicle.trim = $("#ac-trim").value.trim();
+      d.vehicle.color = $("#ac-color").value.trim();
+      var mi = $("#ac-miles").value.replace(/[^0-9]/g, "");
+      if (mi) d.vehicle.mileage = mi;
+      data.dealers.push(d); save();
+      closeModal();
+      toast("Added to your cars");
+      location.hash = "#dealer/" + d.id;
+    });
+    $("#ac-year").focus();
+  }
+
   function openImportModal() {
     openModal(modalHead("Import a quote or listing") +
       '<p class="hint">Paste a <b>listing URL</b> and CarBuddy pulls the car from it (paste the listing’s ' +
@@ -614,7 +651,7 @@
       financingControls("dash") +
       '<div class="btn-row" style="margin:14px 0">' +
         '<button class="btn btn-primary" id="add-dealer">+ Add dealer</button>' +
-        '<button class="btn" id="toggle-import">⬆ Import a quote</button>' +
+        '<button class="btn" id="toggle-import">Import a quote</button>' +
       "</div>";
 
     var offers = data.dealers.filter(isOffer);
@@ -635,7 +672,7 @@
           ' without a quote yet — see the <a href="#cars">Cars tab</a>.</p>' : "");
     }
     var vsBlock = data.dealers.length >= 2
-      ? '<div class="card" id="vs-card"><h3>⚖️ Head-to-head</h3>' +
+      ? '<div class="card" id="vs-card"><h3>Head-to-head</h3>' +
         '<p class="hint">Pick two cars to compare — numbers, and where to research the rest (reliability, owner threads).</p>' +
         '<div class="grid-2">' +
           field("Car A", '<select id="vs-a">' + vsOptions(vsA) + "</select>") +
@@ -769,14 +806,14 @@
       '<p class="section-intro">Cars you’re eyeing but don’t have a written quote for yet. ' +
       "Once a dealer sends an out-the-door number, the car moves to OTD pricing automatically.</p>" +
       '<div class="btn-row" style="margin-bottom:14px">' +
-        '<a class="btn btn-primary" href="#find">🔍 Find a car</a>' +
-        '<button class="btn" id="cars-add">+ Add</button>' +
-        '<button class="btn" id="cars-import">⬆ Import</button>' +
+        '<a class="btn btn-primary" href="#find">Find a car</a>' +
+        '<button class="btn" id="cars-add">+ Add a car</button>' +
+        '<button class="btn" id="cars-import">Import</button>' +
       "</div>" +
       '<div class="mini-list">' + body + "</div>" +
       (offers.length ? '<p class="hint" style="margin-top:14px">' + offers.length + " car" + (offers.length === 1 ? " has" : "s have") +
         ' quotes already — compare them on <a href="#dashboard">OTD pricing</a>.</p>' : "");
-    $("#cars-add").addEventListener("click", openAddDealerModal);
+    $("#cars-add").addEventListener("click", openAddCarModal);
     $("#cars-import").addEventListener("click", openImportModal);
   }
 
