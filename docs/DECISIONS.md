@@ -175,6 +175,30 @@ Since nothing leaves the browser (no LLM API), the advisor is heuristic, not gen
 This reuses the existing template library + red-flags content, so the whole loop
 (their message → what to send back) is one paste and one click.
 
+## D16 — App-flow restructure from the user's UI sketch (2026-07-19)
+The user sketched a new flow (notebook wireframes) and confirmed the interpretation
+via four decisions: Saved Cars = cars being eyed (no price) vs. Offers = real quotes,
+derived from one underlying dealer record (graduates automatically when a price
+arrives); Home becomes a dashboard with the playbook as a progress widget + its own
+page; full onboarding as sketched; add/import become modals with a per-dealer detail
+view. Implementation:
+- **Onboarding overlay** (first run, skippable, replayable via menu "Intro & setup"):
+  splash → 4 swipeable how-it-works cards (scroll-snap carousel, dots) → financing
+  details + first name → Home. Sets `ui.onboarded` (additive field).
+- **Home** (`#home`, new default): greeting, tappable playbook progress card with
+  next-step hint, quick actions (Add / Import / Find), Your Offers and Your Saved Cars
+  as compact cards with lowest-OTD/payment badges.
+- **Playbook** (`#playbook`) is its own page: the checkable timeline, minus the old hero
+  (its content moved into onboarding).
+- **Compare dealers** (`#dashboard`): shared financing + compact cards (offers first,
+  saved cars grouped below). Financing edits re-render only the list, preserving focus.
+- **Dealer detail** (`#dealer/<id>`): the full editor (fields, fee ledger, reply
+  helper) with a back bar. All editing lives here now.
+- **Modals**: Add a dealer (basics only → saves → opens detail) and Import a quote
+  (same importer, now modal; parsed imports land directly on the new dealer's detail).
+- **Find a car** gains "Save this car to my list" → creates a Saved Car and opens it.
+- Test suite rewritten for the new flow (64 checks) + OCR suite updated (15 checks).
+
 ---
 
 ## Open questions still parked for the human

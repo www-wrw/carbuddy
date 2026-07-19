@@ -9,7 +9,13 @@ dealers, email-only, credit-union pre-approval, OTD-only comparison).
 
 ## What's inside
 
-- **🧭 Playbook** — the 7-step process, in order, each step linking to the right tool.
+- **👋 Onboarding** — a splash + swipeable "how it works" intro that collects your
+  financing details once, then drops you on Home. Replayable from the menu.
+- **🏠 Home** — your dashboard: playbook progress with the next step, **Your Offers**
+  (dealers with real OTD quotes) and **Your Saved Cars** (cars you're eyeing — they
+  graduate to Offers when a price comes in), plus quick add/import/find actions.
+- **🧭 Playbook** — the 7-step process as a checkable timeline, each step linking to
+  the right tool.
 - **🚗 Find a car** — enter the exact make/model/trim + ZIP/radius/max mileage/price and
   open prefilled searches on Google, Cars.com, Autotrader, TrueCar, Edmunds, and CarMax.
   Your search stays in your browser until you click through to a marketplace.

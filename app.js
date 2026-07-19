@@ -16,7 +16,7 @@
       dealers: [],
       progress: { steps: {} },  // playbook checklist: { [stepNumber]: true }
       ui: {
-        activeSection: "playbook", myName: "", targetOtd: "", tplDealer: "",
+        activeSection: "home", myName: "", targetOtd: "", tplDealer: "", onboarded: false,
         find: { year: "", make: "", model: "", trim: "", zip: "", radius: "50", priceMax: "", mileageMax: "", condition: "all" }
       }
     };
@@ -214,8 +214,9 @@
         for (var i = 0; i < C.states.length; i++) if (C.states[i].code === code) preset = C.states[i].rate;
         if (preset != null) data.financing.taxRate = preset; // custom (null) leaves rate as-is
         save();
-        // re-render the section so the tax-rate field reflects the preset
-        renderActive();
+        // re-render so the tax-rate field reflects the preset (overlay re-renders itself)
+        if (container.id === "onboarding") renderOnboarding();
+        else renderActive();
         return;
       }
       applyFin(key, t); recompute();
@@ -253,37 +254,132 @@
     }).join("");
 
     $("#section-playbook").innerHTML =
-      '<div class="hero">' +
-        "<h1>Buy your car<br>without the stress.</h1>" +
-        "<p>You’re about to run the process dealers hope you never learn: contact many dealers at " +
-        "once, compare on out-the-door price only, keep everything in writing, and decode every fee. " +
-        "Here’s your step-by-step.</p>" +
-        '<div class="principles">' +
-          '<span class="principle">📨 Many dealers at once</span>' +
-          '<span class="principle">🏷️ Out-the-door only</span>' +
-          '<span class="principle">✍️ In writing</span>' +
-          '<span class="principle">🔍 Every fee decoded</span>' +
-        "</div>" +
-        '<a class="btn btn-primary btn-lg" href="#dashboard">Start — set up your dealers →</a>' +
-      "</div>" +
+      "<h1>The playbook</h1>" +
+      '<p class="section-intro">The 7-step process, in order. Tick each step as you finish it — ' +
+      "your progress is saved on this device and tracked on Home.</p>" +
       '<div class="progress-wrap">' +
-        '<div class="progress-head"><h2 class="onb-h" style="margin:0">Your 7-step playbook</h2>' +
+        '<div class="progress-head"><h2 class="onb-h" style="margin:0">Your progress</h2>' +
           '<span class="progress-count num">' + done + " / " + total + "</span></div>" +
         '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
         (allDone
           ? '<p class="progress-msg">🎉 Every step done — go get your car.</p>'
-          : '<p class="hint">Tick each step as you finish it. Your progress is saved on this device.</p>') +
+          : "") +
         (done > 0 ? '<button class="btn btn-sm btn-ghost" data-reset-progress>Reset checklist</button>' : "") +
       "</div>" +
-      '<div class="tl">' + steps + "</div>";
+      '<div class="tl">' + steps + "</div>" + flowNav("playbook");
+  }
+
+  /* ================================================================== HOME */
+  function playbookStats() {
+    var doneMap = (data.progress && data.progress.steps) || {};
+    var total = C.playbook.length, done = 0;
+    for (var k in doneMap) if (doneMap[k]) done++;
+    var next = null;
+    for (var i = 0; i < C.playbook.length; i++) {
+      if (!doneMap[C.playbook[i].n]) { next = C.playbook[i]; break; }
+    }
+    return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0, next: next };
+  }
+  function isOffer(d) { return dealerCalc(d).hasPrice; }
+
+  // compact card used on Home and the Compare screen — tap to open the detail view
+  function compactCard(d, calcs) {
+    var v = d.vehicle, c = calcs || dealerCalc(d);
+    var vehLine = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ") || d.dealership || "New car";
+    var sub = [d.dealership && vehLine !== d.dealership ? d.dealership : "", v.mileage ? Number(String(v.mileage).replace(/[^0-9]/g, "")).toLocaleString("en-US") + " mi" : ""]
+      .filter(Boolean).join(" · ");
+    return '<a class="card mini-card" href="#dealer/' + d.id + '">' +
+      '<div class="mini-main">' +
+        '<div class="mini-title">' + esc(vehLine) + "</div>" +
+        (sub ? '<div class="mini-sub">' + esc(sub) + "</div>" : "") +
+        '<div class="mini-badges" data-mini-badges="' + d.id + '"></div>' +
+      "</div>" +
+      '<div class="mini-side">' +
+        '<span class="pill status-' + d.status + '">' + statusLabel(d.status) + "</span>" +
+        (c.hasPrice
+          ? '<div class="mini-otd money">' + money(c.otd, 0) + '</div><div class="mini-pay money">' + money(c.monthly, 2) + "/mo</div>"
+          : '<div class="mini-otd hint">no quote yet</div>') +
+        '<span class="mini-go">›</span>' +
+      "</div>" +
+    "</a>";
+  }
+
+  function renderHome() {
+    var s = $("#section-home");
+    var ps = playbookStats();
+    var offers = data.dealers.filter(isOffer);
+    var saved = data.dealers.filter(function (d) { return !isOffer(d); });
+    var name = (data.ui.myName || "").split(" ")[0];
+
+    var offersHtml = offers.length
+      ? offers.map(function (d) { return compactCard(d); }).join("")
+      : '<div class="empty-line">No written quotes yet. Send the email blast and log what comes back.</div>';
+    var savedHtml = saved.length
+      ? saved.map(function (d) { return compactCard(d); }).join("")
+      : '<div class="empty-line">Nothing saved yet. Find a car near you or paste a listing link.</div>';
+
+    s.innerHTML =
+      '<h1>' + (name ? "Hi " + esc(name) + " 👋" : "Your car hunt") + "</h1>" +
+      '<p class="section-intro">Everything in one place: where you are in the process, the cars you’re ' +
+      "watching, and the offers on the table.</p>" +
+
+      '<a class="card progress-card" href="#playbook">' +
+        '<div class="progress-head"><h3 style="margin:0">🧭 Playbook</h3>' +
+          '<span class="progress-count num">' + ps.done + " / " + ps.total + "</span></div>" +
+        '<div class="progress-bar"><div class="progress-fill" style="width:' + ps.pct + '%"></div></div>' +
+        (ps.next
+          ? '<div class="hint" style="margin-top:8px">Next up: <b>Step ' + ps.next.n + " — " + esc(ps.next.title) + "</b> ›</div>"
+          : '<div class="progress-msg" style="margin-top:8px">🎉 Every step done — go get your car.</div>') +
+      "</a>" +
+
+      '<div class="btn-row" style="margin:4px 0 18px">' +
+        '<button class="btn btn-sm" data-home-add>+ Add dealer</button>' +
+        '<button class="btn btn-sm" data-home-import>⬆ Import quote</button>' +
+        '<a class="btn btn-sm" href="#find">🔍 Find a car</a>' +
+      "</div>" +
+
+      '<div class="home-sec-head"><h2>Your offers</h2>' +
+        (offers.length ? '<a class="btn btn-sm btn-ghost" href="#dashboard">Compare all →</a>' : "") + "</div>" +
+      '<p class="hint" style="margin-bottom:10px">Dealers who’ve given you a real out-the-door number.</p>' +
+      '<div class="mini-list">' + offersHtml + "</div>" +
+
+      '<div class="home-sec-head" style="margin-top:22px"><h2>Your saved cars</h2></div>' +
+      '<p class="hint" style="margin-bottom:10px">Cars you’re eyeing — no quote yet. They move up once a price comes in.</p>' +
+      '<div class="mini-list">' + savedHtml + "</div>" +
+      flowNav("home");
+
+    homeBadges(offers);
+    var ab = s.querySelector("[data-home-add]"), ib = s.querySelector("[data-home-import]");
+    if (ab) ab.addEventListener("click", openAddDealerModal);
+    if (ib) ib.addEventListener("click", openImportModal);
+  }
+
+  function homeBadges(offers) {
+    if (!offers.length) return;
+    var minOtd = Infinity, minPay = Infinity;
+    var calcs = {};
+    offers.forEach(function (d) {
+      var c = dealerCalc(d); calcs[d.id] = c;
+      if (c.otd < minOtd) minOtd = c.otd;
+      if (c.monthly < minPay) minPay = c.monthly;
+    });
+    offers.forEach(function (d) {
+      var el = document.querySelector('[data-mini-badges="' + d.id + '"]');
+      if (!el) return;
+      var h = "";
+      if (calcs[d.id].otd === minOtd) h += '<span class="badge">★ Lowest OTD</span>';
+      if (calcs[d.id].monthly === minPay) h += '<span class="badge badge-pay">Lowest payment</span>';
+      el.innerHTML = h;
+    });
   }
   function linkName(id) {
-    return { playbook: "Home", find: "Find a car", dashboard: "Dealers", calculator: "Calculator",
-             templates: "Emails", fees: "Fee Decoder", guide: "Field Guide", data: "Your Data" }[id] || id;
+    return { home: "Home", playbook: "Playbook", find: "Find a car", dashboard: "Compare Dealers",
+             calculator: "Calculator", templates: "Emails", fees: "Fee Decoder",
+             guide: "Field Guide", data: "Your Data" }[id] || id;
   }
 
   // linear prev/next footer so the process flows without a persistent nav
-  var FLOW = ["playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  var FLOW = ["home", "playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
   function flowNav(id) {
     var i = FLOW.indexOf(id);
     var prev = i > 0 ? FLOW[i - 1] : null;
@@ -369,6 +465,8 @@
           field("Max price", '<input id="find-price" inputmode="numeric" value="' + esc(f.priceMax) + '" placeholder="Any">') +
         "</div>" +
         field("Max mileage", '<input id="find-mileage" inputmode="numeric" value="' + esc(f.mileageMax) + '" placeholder="Any">') +
+        '<button class="btn btn-block" id="find-save-car">💾 Save this car to my list</button>' +
+        '<p class="hint" style="margin-top:6px">Saves it under “Your saved cars” on Home, ready to attach a dealer and quote later.</p>' +
       "</div>" +
       '<div id="find-links"></div>' + flowNav("find");
 
@@ -386,6 +484,18 @@
       data.ui.find.year = v.year || ""; data.ui.find.make = v.make || "";
       data.ui.find.model = v.model || ""; data.ui.find.trim = v.trim || "";
       save(); renderFind();
+    });
+    $("#find-save-car").addEventListener("click", function () {
+      var q = data.ui.find;
+      if (!(q.make || "").trim() || !(q.model || "").trim()) { toast("Enter at least a make and model first."); return; }
+      var d = newDealer();
+      d.vehicle.year = (q.year || "").trim();
+      d.vehicle.make = (q.make || "").trim();
+      d.vehicle.model = (q.model || "").trim();
+      d.vehicle.trim = (q.trim || "").trim();
+      data.dealers.push(d); save();
+      toast("Saved to your cars");
+      location.hash = "#dealer/" + d.id;
     });
     renderFindLinks();
   }
@@ -406,33 +516,92 @@
       '<div class="btn-row">' + links + "</div></div>";
   }
 
-  /* =========================================================== DASHBOARD (A) */
+  /* ---------------------------------------------------------------- modals */
+  function openModal(html, onClose) {
+    var wrap = $("#modal-wrap"), box = $("#modal");
+    box.innerHTML = html;
+    wrap.hidden = false;
+    document.body.classList.add("no-scroll");
+    modalCloser = onClose || null;
+    requestAnimationFrame(function () { wrap.classList.add("show"); });
+  }
+  var modalCloser = null;
+  function closeModal() {
+    var wrap = $("#modal-wrap");
+    if (wrap.hidden) return;
+    wrap.classList.remove("show");
+    document.body.classList.remove("no-scroll");
+    setTimeout(function () { wrap.hidden = true; $("#modal").innerHTML = ""; }, 180);
+    if (modalCloser) { var f = modalCloser; modalCloser = null; f(); }
+  }
+  function modalHead(title) {
+    return '<div class="modal-head"><h3>' + title + '</h3><button class="btn btn-sm btn-ghost" data-modal-close aria-label="Close">✕</button></div>';
+  }
+
+  function openAddDealerModal() {
+    openModal(modalHead("Add a dealer") +
+      '<p class="hint">Just the basics — everything else lives on the dealer’s page.</p>' +
+      field("Dealership", '<input id="am-dealership" placeholder="Dealer name">') +
+      '<div class="grid-3">' +
+        field("Year", '<input id="am-year" inputmode="numeric" placeholder="2026">') +
+        field("Make", '<input id="am-make" placeholder="Toyota">') +
+        field("Model", '<input id="am-model" placeholder="RAV4">') +
+      "</div>" +
+      '<div class="grid-2">' +
+        field("Trim", '<input id="am-trim" placeholder="Optional">') +
+        field("Sale price", '<input id="am-price" inputmode="decimal" placeholder="If quoted">') +
+      "</div>" +
+      '<div class="btn-row" style="margin-top:6px">' +
+        '<button class="btn btn-primary" id="am-save">Add dealer</button>' +
+        '<button class="btn btn-ghost" data-modal-close>Cancel</button>' +
+      "</div>");
+    $("#am-save").addEventListener("click", function () {
+      var price = clamp0(num($("#am-price").value));
+      var d = newDealer();
+      d.dealership = $("#am-dealership").value.trim();
+      d.vehicle.year = $("#am-year").value.trim();
+      d.vehicle.make = $("#am-make").value.trim();
+      d.vehicle.model = $("#am-model").value.trim();
+      d.vehicle.trim = $("#am-trim").value.trim();
+      d.quote.salePrice = price;
+      if (price > 0) d.status = "quoted";
+      data.dealers.push(d); save();
+      closeModal();
+      location.hash = "#dealer/" + d.id;
+    });
+    $("#am-dealership").focus();
+  }
+
+  function openImportModal() {
+    openModal(modalHead("Import a quote or listing") +
+      '<p class="hint">Paste a <b>listing URL</b> and CarBuddy pulls the car from it (paste the listing’s ' +
+      "page text too for price &amp; dealer). Or upload a <b>photo</b>/<b>PDF</b> of a quote, an " +
+      "email/<b>.txt</b>/<b>.eml</b>/<b>.csv</b>, or a CarBuddy <b>.json</b>. Everything is read " +
+      "<b>on your device</b> — nothing leaves your browser. Best-effort, so review the fields afterward.</p>" +
+      '<div class="btn-row" style="margin-bottom:10px">' +
+        '<label class="btn btn-sm" style="cursor:pointer">Choose file…' +
+          '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,.pdf,image/*,application/pdf,text/*,message/rfc822" style="display:none"></label>' +
+      "</div>" +
+      '<div class="import-status" id="import-status" hidden></div>' +
+      '<textarea id="quote-text" placeholder="Paste a listing URL, or the dealer’s quote / listing text / email…"></textarea>' +
+      '<div class="btn-row" style="margin-top:8px">' +
+        '<button class="btn btn-primary btn-sm" id="parse-quote">Parse &amp; add dealer</button>' +
+        '<button class="btn btn-sm btn-ghost" data-modal-close>Cancel</button>' +
+      "</div>");
+    wireImport();
+    $("#quote-text").focus();
+  }
+
+  /* ================================================== COMPARE DEALERS (A) */
   function renderDashboard() {
     var s = $("#section-dashboard");
-    var head = "<h1>Dealer comparison</h1>" +
-      '<p class="section-intro">Log every dealer’s itemized out-the-door quote. Lowest OTD and lowest ' +
-      "monthly payment are highlighted automatically.</p>" +
+    var head = "<h1>Compare dealers</h1>" +
+      '<p class="section-intro">Every dealer side by side by out-the-door price. Tap a card for the ' +
+      "full quote, fee ledger, and reply helper.</p>" +
       financingControls("dash") +
-      '<div class="btn-row" style="margin:14px 0 0">' +
+      '<div class="btn-row" style="margin:14px 0">' +
         '<button class="btn btn-primary" id="add-dealer">+ Add dealer</button>' +
         '<button class="btn" id="toggle-import">⬆ Import a quote</button>' +
-      "</div>" +
-      '<div class="card import-panel" id="import-panel" hidden>' +
-        "<h3>Import a quote or listing</h3>" +
-        '<p class="hint">Paste a <b>listing URL</b> and CarBuddy pulls the car from it (paste the listing’s ' +
-        "page text too for price &amp; dealer). Or upload a <b>photo</b>/<b>PDF</b> of a quote, an " +
-        "email/<b>.txt</b>/<b>.eml</b>/<b>.csv</b>, or a CarBuddy <b>.json</b>. Everything is read " +
-        "<b>on your device</b> — nothing leaves your browser. Best-effort, so review the fields afterward.</p>" +
-        '<div class="btn-row" style="margin-bottom:10px">' +
-          '<label class="btn btn-sm" style="cursor:pointer">Choose file…' +
-            '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,.pdf,image/*,application/pdf,text/*,message/rfc822" style="display:none"></label>' +
-        "</div>" +
-        '<div class="import-status" id="import-status" hidden></div>' +
-        '<textarea id="quote-text" placeholder="Paste a listing URL, or the dealer’s quote / listing text / email…"></textarea>' +
-        '<div class="btn-row" style="margin-top:8px">' +
-          '<button class="btn btn-primary btn-sm" id="parse-quote">Parse &amp; add dealer</button>' +
-          '<button class="btn btn-sm btn-ghost" id="cancel-import">Cancel</button>' +
-        "</div>" +
       "</div>";
 
     var body;
@@ -441,27 +610,39 @@
         "<p>No dealers yet. Add the first one, then send them all the same out-the-door request.</p>" +
         '<a class="btn btn-sm" href="#templates">Get the email template →</a></div>';
     } else {
-      body = data.dealers.map(dealerCard).join("");
+      var offers = data.dealers.filter(isOffer);
+      var saved = data.dealers.filter(function (d) { return !isOffer(d); });
+      body = offers.map(function (d) { return compactCard(d); }).join("");
+      if (saved.length) {
+        body += (offers.length ? '<div class="home-sec-head" style="margin-top:18px"><h2>Saved cars (no quote yet)</h2></div>' : "") +
+          saved.map(function (d) { return compactCard(d); }).join("");
+      }
     }
-    s.innerHTML = head + '<div id="dealer-list">' + body + "</div>" + flowNav("dashboard");
+    s.innerHTML = head + '<div id="dealer-list" class="mini-list">' + body + "</div>" + flowNav("dashboard");
 
-    wireFinancing(s, updateComputed);
-    $("#add-dealer").addEventListener("click", addDealer);
-    wireImport();
-    wireDealerList();
-    updateComputed();
-    data.dealers.forEach(function (d) { renderReplyAnalysis(d.id); });
+    wireFinancing(s, updateDashboardList);
+    $("#add-dealer").addEventListener("click", openAddDealerModal);
+    $("#toggle-import").addEventListener("click", openImportModal);
+    homeBadges(data.dealers.filter(isOffer));
+  }
+
+  // re-render only the compare list (keeps focus in the financing inputs above it)
+  function updateDashboardList() {
+    var list = $("#dealer-list"); if (!list) return;
+    var offers = data.dealers.filter(isOffer);
+    var saved = data.dealers.filter(function (d) { return !isOffer(d); });
+    if (data.dealers.length) {
+      var body = offers.map(function (d) { return compactCard(d); }).join("");
+      if (saved.length) {
+        body += (offers.length ? '<div class="home-sec-head" style="margin-top:18px"><h2>Saved cars (no quote yet)</h2></div>' : "") +
+          saved.map(function (d) { return compactCard(d); }).join("");
+      }
+      list.innerHTML = body;
+      homeBadges(offers);
+    }
   }
 
   function wireImport() {
-    var panel = $("#import-panel");
-    $("#toggle-import").addEventListener("click", function () {
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) { panel.scrollIntoView({ block: "nearest" }); $("#quote-text").focus(); }
-    });
-    $("#cancel-import").addEventListener("click", function () {
-      panel.hidden = true; $("#quote-text").value = ""; setImportStatus("");
-    });
     $("#quote-file").addEventListener("change", function (e) {
       var f = e.target.files[0]; if (!f) return;
       e.target.value = ""; // allow re-choosing the same file
@@ -606,14 +787,8 @@
     };
     data.dealers.push(d); save();
     var found = countFound(d);
-    $("#import-panel").hidden = true; $("#quote-text").value = "";
-    renderDashboard();
-    var card = $('.dealer-card[data-id="' + d.id + '"]');
-    if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.classList.add("flash");
-      setTimeout(function () { card.classList.remove("flash"); }, 1500);
-    }
+    closeModal();
+    location.hash = "#dealer/" + d.id;
     toast(found ? "Imported " + found + " field" + (found > 1 ? "s" : "") + " — please review"
                 : "Added a dealer — couldn’t read details, fill it in");
   }
@@ -714,51 +889,64 @@
     "</div>";
   }
 
-  function addDealer() {
-    data.dealers.push({
+  function newDealer() {
+    return {
       id: uid("d_"), dealership: "", contact: "", status: "contacted",
       vehicle: { year: "", make: "", model: "", trim: "", color: "", vin: "", stock: "", mileage: "" },
       quote: { salePrice: 0, fees: [] }, listingUrl: "", notes: "", tactics: [], lastReply: "",
       createdAt: Date.now(), updatedAt: Date.now()
-    });
-    save(); renderDashboard();
+    };
   }
 
   function findDealer(id) { for (var i = 0; i < data.dealers.length; i++) if (data.dealers[i].id === id) return data.dealers[i]; return null; }
 
-  function wireDealerList() {
-    var list = $("#dealer-list");
-    if (!list) return;
+  /* ============================================================ DEALER DETAIL */
+  var detailId = null;
+  function renderDetail(id) {
+    detailId = id || detailId;
+    var s = $("#section-detail");
+    var d = findDealer(detailId);
+    if (!d) { location.hash = "#home"; return; }
+    s.innerHTML =
+      '<div class="detail-bar">' +
+        '<a class="btn btn-sm" href="#dashboard">← All dealers</a>' +
+        '<a class="btn btn-sm btn-ghost" href="#home">Home</a>' +
+      "</div>" +
+      financingControls("det") +
+      dealerCard(d);
+    wireFinancing(s, updateComputed);
+    updateComputed();
+    renderReplyAnalysis(d.id);
+  }
 
-    // text/number/select edits (no full re-render → inputs keep focus)
-    list.addEventListener("input", onDealerEdit);
-    list.addEventListener("change", onDealerEdit);
-
-    // button actions (discrete → safe to re-render)
-    list.addEventListener("click", function (e) {
+  function wireDetail() {
+    var s = $("#section-detail");
+    s.addEventListener("input", onDealerEdit);
+    s.addEventListener("change", onDealerEdit);
+    s.addEventListener("click", function (e) {
       var card = e.target.closest(".dealer-card"); if (!card) return;
       var d = findDealer(card.getAttribute("data-id")); if (!d) return;
 
       if (e.target.closest("[data-del-dealer]")) {
         if (confirm("Delete this dealer and its quote?")) {
           data.dealers = data.dealers.filter(function (x) { return x.id !== d.id; });
-          save(); renderDashboard();
+          save(); location.hash = "#dashboard"; renderDashboard();
         }
       } else if (e.target.closest("[data-add-fee]")) {
         d.quote.fees.push({ id: uid("f_"), label: "", amount: 0, category: "negotiable", taxable: true });
-        touch(d); renderDashboard();
+        touch(d); renderDetail();
       } else if (e.target.closest("[data-quick-fees]")) {
         d.quote.fees.push(
           { id: uid("f_"), label: "Doc fee", amount: 0, category: "negotiable", taxable: true },
           { id: uid("f_"), label: "Electronic filing", amount: 0, category: "fake", taxable: true },
           { id: uid("f_"), label: "Title & registration", amount: 0, category: "fixed", taxable: false }
         );
-        touch(d); renderDashboard();
+        touch(d); renderDetail();
       } else if (e.target.closest("[data-del-fee]")) {
         var row = e.target.closest("[data-fee]");
         var fid = row.getAttribute("data-fee");
         d.quote.fees = d.quote.fees.filter(function (f) { return f.id !== fid; });
-        touch(d); renderDashboard();
+        touch(d); renderDetail();
       }
     });
   }
@@ -1175,24 +1363,30 @@
   }
 
   /* -------------------------------------------------------------- rendering */
-  var SECTIONS = ["playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  var SECTIONS = ["home", "playbook", "find", "dashboard", "detail", "calculator", "templates", "fees", "guide", "data"];
   function renderAll() {
-    renderPlaybook(); renderFind(); renderDashboard(); renderCalculator();
+    renderHome(); renderPlaybook(); renderFind(); renderDashboard(); renderCalculator();
     renderTemplates(); renderFees(); renderGuide(); renderData();
     route();
   }
   var RENDERERS = {
-    playbook: renderPlaybook, find: renderFind, dashboard: renderDashboard, calculator: renderCalculator,
+    home: renderHome, playbook: renderPlaybook, find: renderFind, dashboard: renderDashboard,
+    detail: renderDetail, calculator: renderCalculator,
     templates: renderTemplates, fees: renderFees, guide: renderGuide, data: renderData
   };
   function renderActive() { var id = current(); if (RENDERERS[id]) RENDERERS[id](); }
 
   function current() {
     var h = (location.hash || "").replace("#", "");
-    return SECTIONS.indexOf(h) >= 0 ? h : (data.ui.activeSection || "playbook");
+    if (h.indexOf("dealer/") === 0) return "detail";
+    if (SECTIONS.indexOf(h) >= 0 && h !== "detail") return h;
+    var saved = data.ui.activeSection;
+    return (SECTIONS.indexOf(saved) >= 0 && saved !== "detail") ? saved : "home";
   }
   function route() {
     var id = current();
+    var h = (location.hash || "").replace("#", "");
+    if (id === "detail") renderDetail(h.slice("dealer/".length));
     SECTIONS.forEach(function (s) {
       var sec = $("#section-" + s); if (sec) sec.classList.toggle("active", s === id);
     });
@@ -1200,11 +1394,14 @@
     for (var i = 0; i < links.length; i++) {
       links[i].classList.toggle("active", links[i].getAttribute("href") === "#" + id);
     }
-    if (data.ui.activeSection !== id) { data.ui.activeSection = id; save(); }
+    if (id !== "detail" && data.ui.activeSection !== id) { data.ui.activeSection = id; save(); }
     // sections that depend on cross-section data are refreshed on entry
+    if (id === "home") renderHome();
     if (id === "templates") renderTemplates();
-    if (id === "dashboard") updateComputed();
+    if (id === "dashboard") renderDashboard();
+    if (id === "playbook") renderPlaybook();
     setMenu(false);
+    closeModal();
     window.scrollTo(0, 0);
   }
 
@@ -1235,10 +1432,94 @@
   $("#menu-btn").addEventListener("click", function () { setMenu(!menuOpen()); });
   $("#menu-close").addEventListener("click", function () { setMenu(false); });
   $("#scrim").addEventListener("click", function () { setMenu(false); });
-  $("#drawer").addEventListener("click", function (e) { if (e.target.closest("a")) setMenu(false); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && menuOpen()) setMenu(false); });
+  $("#drawer").addEventListener("click", function (e) {
+    if (e.target.closest("#replay-intro")) { e.preventDefault(); setMenu(false); startOnboarding(); return; }
+    if (e.target.closest("a")) setMenu(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!$("#modal-wrap").hidden) { closeModal(); return; }
+    if (menuOpen()) setMenu(false);
+  });
 
+  // modal chrome (close button anywhere inside, scrim click)
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("[data-modal-close]")) closeModal();
+  });
+  $("#modal-scrim").addEventListener("click", closeModal);
+
+  /* ------------------------------------------------------------- onboarding */
+  var onbStep = 0;
+  function startOnboarding() { onbStep = 0; renderOnboarding(); $("#onboarding").hidden = false; document.body.classList.add("no-scroll"); }
+  function finishOnboarding() {
+    data.ui.onboarded = true; save();
+    $("#onboarding").hidden = true; document.body.classList.remove("no-scroll");
+    location.hash = "#home"; renderHome();
+  }
+  function renderOnboarding() {
+    var o = $("#onboarding"), html = "";
+    if (onbStep === 0) {
+      html = '<div class="onb-screen onb-splash">' +
+        '<div class="onb-art">🚗</div>' +
+        '<div class="onb-logo">CarBuddy</div>' +
+        '<h2 class="onb-tag">Buy your car<br>without the stress.</h2>' +
+        '<p class="onb-sub">The process dealers hope you never learn — turned into a calm, step-by-step toolkit.</p>' +
+        '<p class="onb-privacy"><span class="dot"></span> Everything stays in your browser. Nothing is ever uploaded.</p>' +
+        '<div class="onb-actions">' +
+          '<button class="btn btn-primary btn-lg" data-onb-next>Get started</button>' +
+          '<button class="btn btn-ghost" data-onb-skip>Skip the intro</button>' +
+        "</div></div>";
+    } else if (onbStep === 1) {
+      var cards = C.onboarding.map(function (c, i) {
+        return '<div class="onb-card" data-idx="' + i + '">' +
+          '<div class="onb-card-icon">' + c.icon + "</div>" +
+          "<h3>" + esc(c.title) + "</h3><p>" + esc(c.body) + "</p></div>";
+      }).join("");
+      var dots = C.onboarding.map(function (_, i) {
+        return '<span class="onb-dot' + (i === 0 ? " on" : "") + '" data-dot="' + i + '"></span>';
+      }).join("");
+      html = '<div class="onb-screen">' +
+        '<h2 class="onb-head">How it works</h2>' +
+        '<p class="onb-sub">Four moves. Swipe through them →</p>' +
+        '<div class="onb-carousel" id="onb-carousel">' + cards + "</div>" +
+        '<div class="onb-dots">' + dots + "</div>" +
+        '<div class="onb-actions">' +
+          '<button class="btn btn-primary btn-lg" data-onb-next>Next — your numbers</button>' +
+          '<button class="btn btn-ghost" data-onb-skip>Skip</button>' +
+        "</div></div>";
+    } else {
+      html = '<div class="onb-screen">' +
+        '<h2 class="onb-head">Your financing details</h2>' +
+        '<p class="onb-sub">These power every payment and out-the-door number in the app. ' +
+        "Estimates are fine — you can change them anytime.</p>" +
+        field("Your first name (for email sign-offs)", '<input id="onb-name" value="' + esc(data.ui.myName) + '" placeholder="Optional">') +
+        financingControls("onb") +
+        '<div class="onb-actions">' +
+          '<button class="btn btn-primary btn-lg" data-onb-done>Take me home →</button>' +
+        "</div></div>";
+    }
+    o.innerHTML = html;
+    var nx = o.querySelector("[data-onb-next]"), sk = o.querySelector("[data-onb-skip]"), dn = o.querySelector("[data-onb-done]");
+    if (nx) nx.addEventListener("click", function () { onbStep++; renderOnboarding(); });
+    if (sk) sk.addEventListener("click", finishOnboarding);
+    if (dn) dn.addEventListener("click", function () {
+      var n = o.querySelector("#onb-name"); if (n) { data.ui.myName = n.value.trim(); save(); }
+      finishOnboarding();
+    });
+    var name = o.querySelector("#onb-name");
+    if (name) name.addEventListener("input", function () { data.ui.myName = name.value; save(); });
+    if (onbStep === 2) wireFinancing(o, function () {});
+    var car = o.querySelector("#onb-carousel");
+    if (car) car.addEventListener("scroll", function () {
+      var i = Math.round(car.scrollLeft / car.clientWidth);
+      var dots2 = o.querySelectorAll(".onb-dot");
+      for (var k = 0; k < dots2.length; k++) dots2[k].classList.toggle("on", k === i);
+    }, { passive: true });
+  }
+
+  wireDetail();
   window.addEventListener("hashchange", route);
   renderAll();
-  if (!location.hash) location.hash = "#" + (data.ui.activeSection || "playbook");
+  if (!location.hash) location.hash = "#" + current();
+  if (!data.ui.onboarded) startOnboarding();
 })();

@@ -316,5 +316,17 @@ window.CARBUDDY_CONTENT = (function () {
     { code: "custom", name: "Custom rate…", rate: null }
   ];
 
-  return { templates, fees, redFlags, playbook, infoSharing, states };
+  /* --- Onboarding intro cards (the swipeable "what it does" carousel) --- */
+  const onboarding = [
+    { icon: "📨", title: "Contact many dealers at once",
+      body: "Email every dealer in range the same request — instead of negotiating one at a time on their turf. They compete for you." },
+    { icon: "🏷️", title: "Compare out-the-door only",
+      body: "One number that includes every fee and tax. Never monthly payment — that’s where the games hide." },
+    { icon: "✍️", title: "Keep everything in writing",
+      body: "No phone calls, no “just come in.” Email means a paper trail and a pace you control." },
+    { icon: "🔍", title: "Decode every fee",
+      body: "See which line items are real, which are negotiable, and which are pure junk — with the exact words to push back." }
+  ];
+
+  return { templates, fees, redFlags, playbook, infoSharing, states, onboarding };
 })();

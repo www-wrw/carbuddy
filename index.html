@@ -28,20 +28,24 @@
     <nav class="drawer" id="drawer" aria-label="Main navigation" aria-hidden="true">
       <div class="drawer-head"><span>Menu</span>
         <button class="drawer-close" id="menu-close" aria-label="Close menu">✕</button></div>
-      <a href="#playbook"><span class="ico">🧭</span> Home</a>
+      <a href="#home"><span class="ico">🏠</span> Home</a>
+      <a href="#playbook"><span class="ico">🧭</span> Playbook</a>
       <a href="#find"><span class="ico">🚗</span> Find a car</a>
-      <a href="#dashboard"><span class="ico">📋</span> Dealers</a>
+      <a href="#dashboard"><span class="ico">📋</span> Compare dealers</a>
       <a href="#calculator"><span class="ico">🧮</span> Calculator</a>
       <a href="#templates"><span class="ico">✉️</span> Emails</a>
       <a href="#fees"><span class="ico">🔍</span> Fee decoder</a>
       <a href="#guide"><span class="ico">🚩</span> Field guide</a>
       <a href="#data"><span class="ico">🔒</span> Your data</a>
+      <a href="#" id="replay-intro"><span class="ico">↻</span> Intro &amp; setup</a>
     </nav>
 
     <main id="main">
+      <section class="section" id="section-home"></section>
       <section class="section" id="section-playbook"></section>
       <section class="section" id="section-find"></section>
       <section class="section" id="section-dashboard"></section>
+      <section class="section" id="section-detail"></section>
       <section class="section" id="section-calculator"></section>
       <section class="section" id="section-templates"></section>
       <section class="section" id="section-fees"></section>
@@ -49,6 +53,13 @@
       <section class="section" id="section-data"></section>
     </main>
   </div>
+
+  <div class="modal-wrap" id="modal-wrap" hidden>
+    <div class="modal-scrim" id="modal-scrim"></div>
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <div class="onboarding" id="onboarding" hidden></div>
 
   <div class="toast" id="toast"></div>
 
