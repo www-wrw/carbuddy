@@ -221,6 +221,22 @@ Second notebook page:
   · **Full playbook** (the method in prose — per the note "full playbook, not the
   checklist"; the checklist stays on its own page for progress tracking).
 
+## D18 — Bottom tab bar returns; menu slimmed; compact header off Home
+Per user feedback after using the guide hub:
+- **Bottom tab bar** (the user asked for one with "the playbook checklist, active OTD
+  pricing, your financing info and preferred cars"): Home 🏠 · Playbook ✅ (checklist)
+  · OTD 🏷️ (`#dashboard`, now offers-only, renamed "OTD pricing") · Financing 💵
+  (`#calculator`, retitled "Your financing") · Cars 🚗 (new `#cars` section listing
+  saved/preferred cars with Find/Add/Import actions). The dealer detail view highlights
+  the OTD tab. D8's earlier "no bottom nav" choice is superseded — with more surface
+  area, the four working screens deserve one-tap access; the drawer remains for the rest.
+- **Menu slimmed** to Home · Find a car · Emails · Field guide · Your data · Intro &
+  setup (Fee decoder/Playbook/Compare/Calculator now reachable via the field-guide hub
+  and the tab bar).
+- **Compact header** everywhere except Home: inner pages (e.g. Field guide) show only
+  the small wordmark + hamburger; the tagline and privacy line stay on Home, which
+  remains the branded surface.
+
 ---
 
 ## Open questions still parked for the human

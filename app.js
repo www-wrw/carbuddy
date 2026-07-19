@@ -373,13 +373,13 @@
     });
   }
   function linkName(id) {
-    return { home: "Home", playbook: "Playbook", find: "Find a car", dashboard: "Compare Dealers",
-             calculator: "Calculator", templates: "Emails", fees: "Fee Decoder",
-             guide: "Field Guide", data: "Your Data" }[id] || id;
+    return { home: "Home", playbook: "Playbook", find: "Find a car", cars: "Your Cars",
+             dashboard: "OTD Pricing", calculator: "Financing", templates: "Emails",
+             fees: "Fee Decoder", guide: "Field Guide", data: "Your Data" }[id] || id;
   }
 
-  // linear prev/next footer so the process flows without a persistent nav
-  var FLOW = ["home", "playbook", "find", "dashboard", "calculator", "templates", "fees", "guide", "data"];
+  // linear prev/next footer for the sections that aren't on the tab bar
+  var FLOW = ["home", "playbook", "find", "cars", "dashboard", "calculator", "templates", "fees", "guide", "data"];
   function flowNav(id) {
     var i = FLOW.indexOf(id);
     var prev = i > 0 ? FLOW[i - 1] : null;
@@ -605,11 +605,11 @@
     $("#quote-text").focus();
   }
 
-  /* ================================================== COMPARE DEALERS (A) */
+  /* ================================================== OTD PRICING (A) */
   function renderDashboard() {
     var s = $("#section-dashboard");
-    var head = "<h1>Compare dealers</h1>" +
-      '<p class="section-intro">Every dealer side by side by out-the-door price. Tap a card for the ' +
+    var head = "<h1>OTD pricing</h1>" +
+      '<p class="section-intro">Every active quote side by side by out-the-door price. Tap a card for the ' +
       "full quote, fee ledger, and reply helper.</p>" +
       financingControls("dash") +
       '<div class="btn-row" style="margin:14px 0">' +
@@ -617,19 +617,22 @@
         '<button class="btn" id="toggle-import">⬆ Import a quote</button>' +
       "</div>";
 
+    var offers = data.dealers.filter(isOffer);
+    var savedCount = data.dealers.length - offers.length;
     var body;
     if (!data.dealers.length) {
-      body = '<div class="empty"><div class="big">📋</div>' +
+      body = '<div class="empty"><div class="big">🏷️</div>' +
         "<p>No dealers yet. Add the first one, then send them all the same out-the-door request.</p>" +
         '<a class="btn btn-sm" href="#templates">Get the email template →</a></div>';
+    } else if (!offers.length) {
+      body = '<div class="empty"><div class="big">🏷️</div>' +
+        "<p>No written quotes yet. Your " + savedCount + " saved car" + (savedCount === 1 ? "" : "s") +
+        " are on the <a href=\"#cars\">Cars tab</a> — email those dealers for an OTD number.</p>" +
+        '<a class="btn btn-sm" href="#templates">Get the email template →</a></div>';
     } else {
-      var offers = data.dealers.filter(isOffer);
-      var saved = data.dealers.filter(function (d) { return !isOffer(d); });
-      body = offers.map(function (d) { return compactCard(d); }).join("");
-      if (saved.length) {
-        body += (offers.length ? '<div class="home-sec-head" style="margin-top:18px"><h2>Saved cars (no quote yet)</h2></div>' : "") +
-          saved.map(function (d) { return compactCard(d); }).join("");
-      }
+      body = offers.map(function (d) { return compactCard(d); }).join("") +
+        (savedCount ? '<p class="hint" style="margin-top:10px">' + savedCount + " saved car" + (savedCount === 1 ? "" : "s") +
+          ' without a quote yet — see the <a href="#cars">Cars tab</a>.</p>' : "");
     }
     var vsBlock = data.dealers.length >= 2
       ? '<div class="card" id="vs-card"><h3>⚖️ Head-to-head</h3>' +
@@ -746,16 +749,35 @@
   function updateDashboardList() {
     var list = $("#dealer-list"); if (!list) return;
     var offers = data.dealers.filter(isOffer);
-    var saved = data.dealers.filter(function (d) { return !isOffer(d); });
-    if (data.dealers.length) {
-      var body = offers.map(function (d) { return compactCard(d); }).join("");
-      if (saved.length) {
-        body += (offers.length ? '<div class="home-sec-head" style="margin-top:18px"><h2>Saved cars (no quote yet)</h2></div>' : "") +
-          saved.map(function (d) { return compactCard(d); }).join("");
-      }
-      list.innerHTML = body;
+    if (offers.length) {
+      list.innerHTML = offers.map(function (d) { return compactCard(d); }).join("");
       homeBadges(offers);
     }
+  }
+
+  /* ============================================================ YOUR CARS */
+  function renderCars() {
+    var s = $("#section-cars");
+    var saved = data.dealers.filter(function (d) { return !isOffer(d); });
+    var offers = data.dealers.filter(isOffer);
+    var body = saved.length
+      ? saved.map(function (d) { return compactCard(d); }).join("")
+      : '<div class="empty"><div class="big">🚗</div>' +
+        "<p>No saved cars yet. Find one near you, paste a listing link, or add one by hand.</p></div>";
+    s.innerHTML =
+      "<h1>Your cars</h1>" +
+      '<p class="section-intro">Cars you’re eyeing but don’t have a written quote for yet. ' +
+      "Once a dealer sends an out-the-door number, the car moves to OTD pricing automatically.</p>" +
+      '<div class="btn-row" style="margin-bottom:14px">' +
+        '<a class="btn btn-primary" href="#find">🔍 Find a car</a>' +
+        '<button class="btn" id="cars-add">+ Add</button>' +
+        '<button class="btn" id="cars-import">⬆ Import</button>' +
+      "</div>" +
+      '<div class="mini-list">' + body + "</div>" +
+      (offers.length ? '<p class="hint" style="margin-top:14px">' + offers.length + " car" + (offers.length === 1 ? " has" : "s have") +
+        ' quotes already — compare them on <a href="#dashboard">OTD pricing</a>.</p>' : "");
+    $("#cars-add").addEventListener("click", openAddDealerModal);
+    $("#cars-import").addEventListener("click", openImportModal);
   }
 
   function wireImport() {
@@ -1196,9 +1218,9 @@
   function renderCalculator() {
     var s = $("#section-calculator");
     s.innerHTML =
-      "<h1>Payment calculator</h1>" +
-      '<p class="section-intro">Model any price against your shared financing. Then compare terms, and ' +
-      "see what a later lump-sum payment (like selling your old car) would save.</p>" +
+      "<h1>Your financing</h1>" +
+      '<p class="section-intro">The numbers that drive every payment in the app, plus a calculator to ' +
+      "model any price — compare terms, and see what a later lump-sum payment (like selling your old car) would save.</p>" +
       financingControls("calc") +
       '<div class="card">' +
         '<div class="grid-2">' +
@@ -1539,15 +1561,15 @@
   }
 
   /* -------------------------------------------------------------- rendering */
-  var SECTIONS = ["home", "playbook", "find", "dashboard", "detail", "calculator", "templates", "fees", "guide", "data"];
+  var SECTIONS = ["home", "playbook", "find", "cars", "dashboard", "detail", "calculator", "templates", "fees", "guide", "data"];
   function renderAll() {
-    renderHome(); renderPlaybook(); renderFind(); renderDashboard(); renderCalculator();
+    renderHome(); renderPlaybook(); renderFind(); renderCars(); renderDashboard(); renderCalculator();
     renderTemplates(); renderFees(); renderGuide(); renderData();
     route();
   }
   var RENDERERS = {
-    home: renderHome, playbook: renderPlaybook, find: renderFind, dashboard: renderDashboard,
-    detail: renderDetail, calculator: renderCalculator,
+    home: renderHome, playbook: renderPlaybook, find: renderFind, cars: renderCars,
+    dashboard: renderDashboard, detail: renderDetail, calculator: renderCalculator,
     templates: renderTemplates, fees: renderFees, guide: renderGuide, data: renderData
   };
   function renderActive() { var id = current(); if (RENDERERS[id]) RENDERERS[id](); }
@@ -1570,11 +1592,20 @@
     for (var i = 0; i < links.length; i++) {
       links[i].classList.toggle("active", links[i].getAttribute("href") === "#" + id);
     }
+    // bottom tab bar: detail belongs to the OTD tab
+    var tabId = id === "detail" ? "dashboard" : id;
+    var tabs = document.querySelectorAll("#tabbar a");
+    for (var t2 = 0; t2 < tabs.length; t2++) {
+      tabs[t2].classList.toggle("active", tabs[t2].getAttribute("data-tab") === tabId);
+    }
+    // full brand header on Home only; compact everywhere else
+    document.body.classList.toggle("compact-top", id !== "home");
     if (id !== "detail" && data.ui.activeSection !== id) { data.ui.activeSection = id; save(); }
     // sections that depend on cross-section data are refreshed on entry
     if (id === "home") renderHome();
     if (id === "templates") renderTemplates();
     if (id === "dashboard") renderDashboard();
+    if (id === "cars") renderCars();
     if (id === "playbook") renderPlaybook();
     setMenu(false);
     closeModal();
