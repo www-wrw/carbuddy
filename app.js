@@ -16,7 +16,7 @@
       dealers: [],
       progress: { steps: {} },  // playbook checklist: { [stepNumber]: true }
       ui: {
-        activeSection: "home", myName: "", targetOtd: "", tplDealer: "", onboarded: false,
+        activeSection: "home", myName: "", targetOtd: "", tplDealer: "", onboarded: false, findLoc: "",
         find: { year: "", make: "", model: "", trim: "", zip: "", radius: "50", priceMax: "", mileageMax: "", condition: "all" }
       }
     };
@@ -402,7 +402,8 @@
     var mkS = findSlug(mk), mdS = findSlug(md), mkC = findCode(mk), mdC = findCode(md);
     var e = encodeURIComponent, links = [];
 
-    var gq = [yr, mk, md, tr, "for sale", zip ? "near " + zip : "",
+    var locTxt = zip ? "near " + zip : ((q.city || "").trim() ? "near " + q.city.trim() : "");
+    var gq = [yr, mk, md, tr, "for sale at dealerships", locTxt,
       pMax ? "under $" + pMax : "", mMax ? "under " + mMax + " miles" : ""].filter(Boolean).join(" ");
     links.push({ name: "Google", url: "https://www.google.com/search?q=" + e(gq) });
 
@@ -1106,10 +1107,66 @@
         '<a class="btn btn-sm btn-ghost" href="#home">Home</a>' +
       "</div>" +
       financingControls("det") +
-      dealerCard(d);
+      dealerCard(d) +
+      detailFindHtml(d);
     wireFinancing(s, updateComputed);
     updateComputed();
     renderReplyAnalysis(d.id);
+    wireDetailFind(d);
+  }
+
+  /* ------- find this exact car at dealerships near a city/ZIP (detail page) ------- */
+  function detailFindHtml(d) {
+    var v = d.vehicle;
+    var car = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
+    var radius = String(data.ui.find.radius || "50");
+    var radiusOpts = [10, 25, 50, 100, 200, 500].map(function (n) {
+      return '<option value="' + n + '"' + (radius === String(n) ? " selected" : "") + ">" + n + " mi</option>";
+    }).join("");
+    return '<div class="card" id="detail-find">' +
+      "<h3>Find this car at dealerships near you</h3>" +
+      '<p class="hint">Prefilled searches for ' + (car ? "the <b>" + esc(car) + "</b>" : "this car") +
+      " at dealers around a city or ZIP — spot who has it in stock, then email them for OTD quotes. " +
+      "Nothing leaves your browser until you open a link.</p>" +
+      '<div class="grid-2">' +
+        field("City or ZIP", '<input id="df-loc" value="' + esc(data.ui.findLoc || data.ui.find.zip || "") + '" placeholder="Jacksonville or 32204">') +
+        field("Radius", '<select id="df-radius">' + radiusOpts + "</select>") +
+      "</div>" +
+      '<div id="df-links"></div>' +
+    "</div>";
+  }
+  function renderDetailFindLinks(d) {
+    var box = $("#df-links"); if (!box) return;
+    var v = d.vehicle;
+    if (!(v.make || "").trim() || !(v.model || "").trim()) {
+      box.innerHTML = '<p class="hint">Add at least a <b>make</b> and <b>model</b> above to build searches.</p>';
+      return;
+    }
+    var loc = (data.ui.findLoc || "").trim();
+    var isZip = /^\d{5}$/.test(loc);
+    var links = buildFindLinks({
+      year: v.year, make: v.make, model: v.model, trim: v.trim,
+      zip: isZip ? loc : "", city: isZip ? "" : loc,
+      radius: data.ui.find.radius, priceMax: "",
+      mileageMax: v.mileage || "", condition: "all"
+    }).map(function (l) {
+      return '<a class="btn btn-sm" target="_blank" rel="noopener noreferrer" href="' + esc(l.url) + '">' + esc(l.name) + " ↗</a>";
+    }).join("");
+    box.innerHTML = '<div class="btn-row">' + links + "</div>" +
+      (loc && !isZip ? '<p class="hint" style="margin-top:8px">City names carry into the Google search; the marketplace links work best with a 5-digit ZIP.</p>' : "");
+  }
+  function wireDetailFind(d) {
+    var loc = $("#df-loc"), rad = $("#df-radius");
+    if (!loc) return;
+    loc.addEventListener("input", function () {
+      data.ui.findLoc = loc.value;
+      if (/^\d{5}$/.test(loc.value.trim())) data.ui.find.zip = loc.value.trim(); // keep Find page in sync
+      save(); renderDetailFindLinks(d);
+    });
+    rad.addEventListener("change", function () {
+      data.ui.find.radius = rad.value; save(); renderDetailFindLinks(d);
+    });
+    renderDetailFindLinks(d);
   }
 
   function wireDetail() {
@@ -1164,6 +1221,7 @@
       var v = d.vehicle;
       var titleEl = $(".dealer-title", card);
       titleEl.innerHTML = [v.year, v.make, v.model, v.trim].filter(Boolean).map(esc).join(" ") || '<span class="hint">no vehicle yet</span>';
+      if ($("#df-links")) renderDetailFindLinks(d); // keep the nearby-search links current
     } else if (t.hasAttribute("data-fee-f")) {
       var row = t.closest("[data-fee]"); var fid = row.getAttribute("data-fee");
       var fe = null; for (var i = 0; i < d.quote.fees.length; i++) if (d.quote.fees[i].id === fid) fe = d.quote.fees[i];
