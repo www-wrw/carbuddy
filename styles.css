@@ -156,6 +156,9 @@ a.onb-go:hover { text-decoration: underline; }
   padding: 16px; margin-bottom: 14px;
 }
 .card.highlight-otd { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+.dealer-card.flash { animation: flash 1.5s ease; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent), var(--shadow); } 100% { box-shadow: var(--shadow); } }
+.import-panel { border-color: var(--line-2); background: var(--surface-2); }
 
 /* --- Forms --- */
 label { display: block; font-size: .8rem; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }

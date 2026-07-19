@@ -293,7 +293,25 @@
       '<p class="section-intro">Log every dealer’s itemized out-the-door quote. Lowest OTD and lowest ' +
       "monthly payment are highlighted automatically.</p>" +
       financingControls("dash") +
-      '<div class="btn-row" style="margin:14px 0"><button class="btn btn-primary" id="add-dealer">+ Add dealer</button></div>';
+      '<div class="btn-row" style="margin:14px 0 0">' +
+        '<button class="btn btn-primary" id="add-dealer">+ Add dealer</button>' +
+        '<button class="btn" id="toggle-import">⬆ Import a quote</button>' +
+      "</div>" +
+      '<div class="card import-panel" id="import-panel" hidden>' +
+        "<h3>Import a dealer quote</h3>" +
+        '<p class="hint">Upload or paste a quote — email text, <b>.txt</b>, <b>.eml</b>, <b>.csv</b>, ' +
+        "or a CarBuddy <b>.json</b>. It’s read <b>on your device</b>; the file never leaves your browser. " +
+        "Parsing is best-effort, so review the prefilled fields afterward.</p>" +
+        '<div class="btn-row" style="margin-bottom:10px">' +
+          '<label class="btn btn-sm" style="cursor:pointer">Choose file…' +
+            '<input type="file" id="quote-file" accept=".txt,.eml,.json,.csv,.md,.text,text/*,message/rfc822" style="display:none"></label>' +
+        "</div>" +
+        '<textarea id="quote-text" placeholder="…or paste the dealer’s quote / email here"></textarea>' +
+        '<div class="btn-row" style="margin-top:8px">' +
+          '<button class="btn btn-primary btn-sm" id="parse-quote">Parse &amp; add dealer</button>' +
+          '<button class="btn btn-sm btn-ghost" id="cancel-import">Cancel</button>' +
+        "</div>" +
+      "</div>";
 
     var body;
     if (!data.dealers.length) {
@@ -307,8 +325,99 @@
 
     wireFinancing(s, updateComputed);
     $("#add-dealer").addEventListener("click", addDealer);
+    wireImport();
     wireDealerList();
     updateComputed();
+  }
+
+  function wireImport() {
+    var panel = $("#import-panel");
+    $("#toggle-import").addEventListener("click", function () {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) { panel.scrollIntoView({ block: "nearest" }); $("#quote-text").focus(); }
+    });
+    $("#cancel-import").addEventListener("click", function () { panel.hidden = true; $("#quote-text").value = ""; });
+    $("#quote-file").addEventListener("change", function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () { $("#quote-text").value = String(reader.result || ""); toast("Loaded “" + f.name + "”"); };
+      reader.onerror = function () { toast("Couldn’t read that file."); };
+      reader.readAsText(f);
+      e.target.value = ""; // allow re-choosing the same file
+    });
+    $("#parse-quote").addEventListener("click", function () { handleParse($("#quote-text").value); });
+  }
+
+  function looksJson(t) { t = t.trim(); return t.charAt(0) === "{" || t.charAt(0) === "["; }
+
+  function handleParse(text) {
+    text = (text || "").trim();
+    if (!text) { toast("Paste or choose a quote first."); return; }
+    if (looksJson(text)) {
+      try {
+        var obj = JSON.parse(text);
+        var dealerObj = obj && Array.isArray(obj.dealers) ? obj.dealers[0] : obj;
+        if (dealerObj && typeof dealerObj === "object") { addParsedDealer(fromJsonDealer(dealerObj)); return; }
+      } catch (e) { /* not valid JSON — fall through to text parsing */ }
+    }
+    if (!window.CARBUDDY_PARSE) { toast("Parser unavailable."); return; }
+    addParsedDealer(window.CARBUDDY_PARSE.parseQuote(text));
+  }
+
+  // map a CarBuddy-shaped dealer object (e.g. from an exported backup) to a parsed shape
+  function fromJsonDealer(o) {
+    var v = o.vehicle || {};
+    var q = o.quote || {};
+    return {
+      dealership: o.dealership || "", contact: o.contact || "",
+      vehicle: { year: v.year, make: v.make, model: v.model, trim: v.trim, color: v.color, vin: v.vin, stock: v.stock },
+      salePrice: num(q.salePrice),
+      fees: Array.isArray(q.fees) ? q.fees.map(function (f) {
+        return { label: f.label || "Fee", amount: num(f.amount), category: f.category || "negotiable", taxable: f.taxable !== false };
+      }) : []
+    };
+  }
+
+  function countFound(d) {
+    var v = d.vehicle, n = 0;
+    ["year", "make", "model", "trim", "color", "vin", "stock"].forEach(function (k) { if (v[k]) n++; });
+    if (d.dealership) n++;
+    if (d.contact) n++;
+    if (num(d.quote.salePrice) > 0) n++;
+    n += (d.quote.fees || []).length;
+    return n;
+  }
+
+  function addParsedDealer(p) {
+    p = p || {};
+    var pv = p.vehicle || {};
+    var d = {
+      id: uid("d_"), dealership: p.dealership || "", contact: p.contact || "", status: "quoted",
+      vehicle: {
+        year: pv.year || "", make: pv.make || "", model: pv.model || "", trim: pv.trim || "",
+        color: pv.color || "", vin: pv.vin || "", stock: pv.stock || ""
+      },
+      quote: {
+        salePrice: num(p.salePrice) || 0,
+        fees: (p.fees || []).map(function (f) {
+          return { id: uid("f_"), label: f.label || "Fee", amount: num(f.amount) || 0,
+                   category: f.category || "negotiable", taxable: f.taxable !== false };
+        })
+      },
+      notes: "", tactics: [], createdAt: Date.now(), updatedAt: Date.now()
+    };
+    data.dealers.push(d); save();
+    var found = countFound(d);
+    $("#import-panel").hidden = true; $("#quote-text").value = "";
+    renderDashboard();
+    var card = $('.dealer-card[data-id="' + d.id + '"]');
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("flash");
+      setTimeout(function () { card.classList.remove("flash"); }, 1500);
+    }
+    toast(found ? "Imported " + found + " field" + (found > 1 ? "s" : "") + " — please review"
+                : "Added a dealer — couldn’t read details, fill it in");
   }
 
   function dealerCard(d) {

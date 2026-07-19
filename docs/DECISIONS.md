@@ -54,7 +54,32 @@ Dashboard, Calculator, Templates, Fee Decoder, Guide (red flags + info-sharing),
 
 ---
 
+## D8 — Onboarding home + hamburger nav + checkable playbook timeline
+Home is an onboarding screen (hero, four principles, Start CTA) with the 7-step
+playbook rendered as a checkable timeline whose completion state persists in
+`progress.steps` (additive field, defaulted via the migration gate). The fixed bottom
+tab bar was replaced by a right-side hamburger drawer plus per-section prev/next
+flow-nav, so the process reads as a guided flow rather than a set of tabs.
+
+## D9 — "Import a quote" prefills a dealer, parsed 100% in-browser
+Add-dealer now accepts an uploaded/pasted quote (email text, `.txt`, `.eml`, `.csv`,
+or a CarBuddy JSON) and prefills a new dealer card. Parsing runs entirely client-side
+(`parse.js`, no dependencies), upholding the locked privacy decision — the file never
+leaves the browser. Heuristic extraction covers dealership, contact, vehicle
+(year/make/model/trim/VIN/stock/color), sale price, and common fees (mapped to the
+fixed/negotiable/fake taxonomy). **PDF and scanned-image OCR were deliberately excluded:**
+reliable extraction from those would require either an external service (violates the
+privacy pitch) or bundling a large library like pdf.js / Tesseract (violates the
+no-dependency, no-build architecture). The UI states parsing is local and best-effort,
+and every imported field lands in an editable card for the user to verify. Imported
+dealers default to status "quoted".
+
+---
+
 ## Open questions still parked for the human
 - Custom domain later? (D2 chose github.io subpath for now.)
 - Any monetization in v2? (D4 says no for v1.)
 - Additional state tax/registration presets beyond the seed set — add as users request.
+- Quote import is text-only by design (D9). If PDF/photo import becomes a must-have,
+  it needs an explicit privacy decision (bundle a client-side library, or accept an
+  optional external OCR with clear consent).
