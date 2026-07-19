@@ -316,6 +316,24 @@ window.CARBUDDY_CONTENT = (function () {
     { code: "custom", name: "Custom rate…", rate: null }
   ];
 
+  /* --- Car insurance guide (Field Guide tile) --- */
+  const insurance = [
+    { n: 1, title: "Shop insurance before you commit to the car",
+      body: "Rates vary wildly by model — a trim with a bigger engine or a theft-prone model can cost hundreds more per year. Get rough quotes on your top 2–3 candidates while you're still comparing, not after you've signed." },
+    { n: 2, title: "Quote the exact VIN once you have it",
+      body: "Once a dealer confirms the VIN in writing, run real quotes on that VIN. Trim, drivetrain, and safety equipment all move the premium." },
+    { n: 3, title: "Compare identical coverage, not identical price",
+      body: "Line up the same liability limits, deductibles, and comprehensive/collision on every quote. A cheaper quote with thinner coverage isn't cheaper — it's just less insurance." },
+    { n: 4, title: "Get at least three quotes",
+      body: "One national carrier, one that's strong in your state or region, and an independent agent or comparison site that shops several carriers at once. Insurers price the same driver very differently." },
+    { n: 5, title: "Ask about the discounts that actually move the number",
+      body: "Bundling with home/renters, pay-in-full, paperless, good student, low mileage, and safety features. Ask directly: “What discounts am I not getting?”" },
+    { n: 6, title: "Buy GAP from the insurer or your credit union — not the dealer",
+      body: "If you're financing with a small down payment, GAP is worth having, but dealer GAP is routinely 2–3× the price. Your insurer or credit union sells the same protection for far less." },
+    { n: 7, title: "Have proof of insurance ready for pickup day",
+      body: "The dealer will need it before you drive off. Start the policy the day you sign, not before — and confirm your old car's coverage overlaps if you're trading later." }
+  ];
+
   /* --- Onboarding intro cards (the swipeable "what it does" carousel) --- */
   const onboarding = [
     { icon: "📨", title: "Contact many dealers at once",
@@ -328,5 +346,5 @@ window.CARBUDDY_CONTENT = (function () {
       body: "See which line items are real, which are negotiable, and which are pure junk — with the exact words to push back." }
   ];
 
-  return { templates, fees, redFlags, playbook, infoSharing, states, onboarding };
+  return { templates, fees, redFlags, playbook, infoSharing, states, onboarding, insurance };
 })();

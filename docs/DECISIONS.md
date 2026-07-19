@@ -199,6 +199,28 @@ view. Implementation:
 - **Find a car** gains "Save this car to my list" → creates a Saved Car and opens it.
 - Test suite rewritten for the new flow (64 checks) + OCR suite updated (15 checks).
 
+## D17 — Bug fixes + second sketch page (head-to-head, guide hub, insurance)
+Bugs from device testing:
+- **Carousel dots drifted** (wrong dot lit on later cards): index assumed full-width
+  cards; now computed from actual card centers vs. viewport center.
+- **Delete dealer did nothing** in the in-app browser: `window.confirm()` is silently
+  suppressed in some webviews. Replaced with an in-app confirm modal (`confirmAction`),
+  also used for Clear-all-data.
+- **CarMax link imported an empty card**: aggregator listing URLs are opaque IDs. A
+  bare URL that yields no car info no longer silently adds; the import modal explains
+  (paste the page text for car/price/mileage) and offers "Add with just the link".
+Second notebook page:
+- **Head-to-head compare** on the Compare screen: pick two cars → side-by-side
+  numbers (mileage, sale price, fees, junk-fee total, tax, OTD, monthly, interest over
+  the term) with the winning cell checked, plus per-car research links (reviews /
+  owner threads / known issues — the "netizen thoughts" ask, served as curated
+  searches since fetching reviews would need a backend) and each car's notes, ending
+  in a plain-language verdict. Defaults to the two lowest-OTD offers.
+- **Field Guide is a tile hub**: Red flags · Safe to share · Fee decoder (link) ·
+  **Car insurance** (new 7-step guide to shopping coverage, incl. GAP-not-from-dealer)
+  · **Full playbook** (the method in prose — per the note "full playbook, not the
+  checklist"; the checklist stays on its own page for progress tracking).
+
 ---
 
 ## Open questions still parked for the human

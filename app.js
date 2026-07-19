@@ -538,6 +538,19 @@
     return '<div class="modal-head"><h3>' + title + '</h3><button class="btn btn-sm btn-ghost" data-modal-close aria-label="Close">✕</button></div>';
   }
 
+  // In-app confirmation — window.confirm() is silently blocked in some in-app browsers.
+  function confirmAction(title, message, yesLabel, onYes) {
+    openModal(modalHead(title) +
+      "<p>" + message + "</p>" +
+      '<div class="btn-row" style="margin-top:6px">' +
+        '<button class="btn btn-danger" id="confirm-yes">' + yesLabel + "</button>" +
+        '<button class="btn btn-ghost" data-modal-close>Cancel</button>' +
+      "</div>");
+    $("#confirm-yes").addEventListener("click", function () {
+      modalCloser = null; closeModal(); onYes();
+    });
+  }
+
   function openAddDealerModal() {
     openModal(modalHead("Add a dealer") +
       '<p class="hint">Just the basics — everything else lives on the dealer’s page.</p>' +
@@ -618,12 +631,115 @@
           saved.map(function (d) { return compactCard(d); }).join("");
       }
     }
-    s.innerHTML = head + '<div id="dealer-list" class="mini-list">' + body + "</div>" + flowNav("dashboard");
+    var vsBlock = data.dealers.length >= 2
+      ? '<div class="card" id="vs-card"><h3>⚖️ Head-to-head</h3>' +
+        '<p class="hint">Pick two cars to compare — numbers, and where to research the rest (reliability, owner threads).</p>' +
+        '<div class="grid-2">' +
+          field("Car A", '<select id="vs-a">' + vsOptions(vsA) + "</select>") +
+          field("Car B", '<select id="vs-b">' + vsOptions(vsB) + "</select>") +
+        "</div>" +
+        '<div id="vs-box"></div></div>'
+      : "";
 
-    wireFinancing(s, updateDashboardList);
+    s.innerHTML = head + vsBlock + '<div id="dealer-list" class="mini-list">' + body + "</div>" + flowNav("dashboard");
+
+    wireFinancing(s, function () { updateDashboardList(); renderVs(); });
     $("#add-dealer").addEventListener("click", openAddDealerModal);
     $("#toggle-import").addEventListener("click", openImportModal);
     homeBadges(data.dealers.filter(isOffer));
+    if (data.dealers.length >= 2) {
+      $("#vs-a").addEventListener("change", function () { vsA = this.value; renderVs(); });
+      $("#vs-b").addEventListener("change", function () { vsB = this.value; renderVs(); });
+      renderVs();
+    }
+  }
+
+  /* ------------------------- head-to-head: compare two cars ------------------------- */
+  var vsA = "", vsB = "";
+  function vsDefaults() {
+    // default to the two lowest-OTD offers, else the first two cars
+    var ranked = data.dealers.slice().sort(function (a, b) {
+      var ca = dealerCalc(a), cb = dealerCalc(b);
+      if (ca.hasPrice !== cb.hasPrice) return ca.hasPrice ? -1 : 1;
+      return ca.otd - cb.otd;
+    });
+    if (!findDealer(vsA)) vsA = ranked[0] ? ranked[0].id : "";
+    if (!findDealer(vsB) || vsB === vsA) vsB = (ranked[1] && ranked[1].id !== vsA) ? ranked[1].id : (ranked.find(function (d) { return d.id !== vsA; }) || {}).id || "";
+  }
+  function vsOptions(sel) {
+    vsDefaults();
+    return data.dealers.map(function (d) {
+      var v = d.vehicle;
+      var label = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ") || "Unnamed";
+      if (d.dealership) label += " · " + d.dealership;
+      return '<option value="' + d.id + '"' + (sel === d.id ? " selected" : "") + ">" + esc(label) + "</option>";
+    }).join("");
+  }
+  function researchLinks(d) {
+    var v = d.vehicle;
+    var q = [v.year, v.make, v.model].filter(Boolean).join(" ");
+    if (!q) return '<span class="hint">add year/make/model</span>';
+    var e = encodeURIComponent;
+    return '<a target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?q=' + e(q + " reliability review") + '">Reviews ↗</a> · ' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?q=' + e("reddit " + q + " long term owner review problems") + '">Owner threads ↗</a> · ' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?q=' + e(q + " known problems transmission") + '">Known issues ↗</a>';
+  }
+  function renderVs() {
+    var box = $("#vs-box"); if (!box) return;
+    vsDefaults();
+    var a = findDealer(vsA), b = findDealer(vsB);
+    if (!a || !b) { box.innerHTML = ""; return; }
+    if (a.id === b.id) { box.innerHTML = '<p class="hint">Pick two different cars to compare.</p>'; return; }
+    var ca = dealerCalc(a), cb = dealerCalc(b);
+    var f = data.financing, term = Math.round(num(f.term)) || 1;
+
+    function carName(d) { var v = d.vehicle; return esc([v.year, v.make, v.model, v.trim].filter(Boolean).join(" ") || d.dealership || "Unnamed"); }
+    function lo(x, y, lowerWins) { // returns [clsA, clsB]
+      if (x == null || y == null || !isFinite(x) || !isFinite(y) || x === y) return ["", ""];
+      var aWins = lowerWins ? x < y : x > y;
+      return aWins ? [" vs-win", ""] : ["", " vs-win"];
+    }
+    function junkTotal(d) {
+      return (d.quote.fees || []).reduce(function (s2, fe) { return s2 + (fe.category === "fake" ? num(fe.amount) : 0); }, 0);
+    }
+    var rows = [];
+    function row(label, va, vb, clsPair) {
+      rows.push('<div class="vs-row"><div class="vs-lbl">' + label + '</div>' +
+        '<div class="vs-cell money' + (clsPair ? clsPair[0] : "") + '">' + va + "</div>" +
+        '<div class="vs-cell money' + (clsPair ? clsPair[1] : "") + '">' + vb + "</div></div>");
+    }
+    var mA = num(a.vehicle.mileage), mB = num(b.vehicle.mileage);
+    row("Mileage", mA ? mA.toLocaleString("en-US") + " mi" : "—", mB ? mB.toLocaleString("en-US") + " mi" : "—", lo(mA || null, mB || null, true));
+    row("Sale price", ca.hasPrice ? money(num(a.quote.salePrice), 0) : "—", cb.hasPrice ? money(num(b.quote.salePrice), 0) : "—",
+      lo(ca.hasPrice ? num(a.quote.salePrice) : null, cb.hasPrice ? num(b.quote.salePrice) : null, true));
+    row("All fees", money(ca.feesTotal, 0), money(cb.feesTotal, 0), lo(ca.feesTotal, cb.feesTotal, true));
+    row("· junk fees", money(junkTotal(a), 0), money(junkTotal(b), 0), lo(junkTotal(a), junkTotal(b), true));
+    row("Tax", ca.hasPrice ? money(ca.tax, 0) : "—", cb.hasPrice ? money(cb.tax, 0) : "—", null);
+    row("<b>Out the door</b>", ca.hasPrice ? "<b>" + money(ca.otd, 0) + "</b>" : "—", cb.hasPrice ? "<b>" + money(cb.otd, 0) + "</b>" : "—",
+      lo(ca.hasPrice ? ca.otd : null, cb.hasPrice ? cb.otd : null, true));
+    row("Est. monthly", ca.hasPrice ? money(ca.monthly, 2) : "—", cb.hasPrice ? money(cb.monthly, 2) : "—",
+      lo(ca.hasPrice ? ca.monthly : null, cb.hasPrice ? cb.monthly : null, true));
+    row("Interest over " + term + " mo",
+      ca.hasPrice ? money(ca.monthly * term - ca.financed, 0) : "—",
+      cb.hasPrice ? money(cb.monthly * term - cb.financed, 0) : "—", null);
+    rows.push('<div class="vs-row"><div class="vs-lbl">Research</div>' +
+      '<div class="vs-cell vs-links">' + researchLinks(a) + '</div>' +
+      '<div class="vs-cell vs-links">' + researchLinks(b) + "</div></div>");
+    rows.push('<div class="vs-row"><div class="vs-lbl">Your notes</div>' +
+      '<div class="vs-cell vs-note">' + (a.notes ? esc(a.notes) : '<span class="hint">none yet</span>') + "</div>" +
+      '<div class="vs-cell vs-note">' + (b.notes ? esc(b.notes) : '<span class="hint">none yet</span>') + "</div></div>");
+
+    var verdict = "";
+    if (ca.hasPrice && cb.hasPrice && ca.otd !== cb.otd) {
+      var cheaper = ca.otd < cb.otd ? a : b;
+      var diff = Math.abs(ca.otd - cb.otd);
+      verdict = '<p class="vs-verdict">💡 <b>' + carName(cheaper) + "</b> is " + money(diff, 0) +
+        " cheaper out-the-door. Numbers aside, check the research links for reliability and owner reports before deciding.</p>";
+    }
+    box.innerHTML =
+      '<div class="vs-head"><div></div><div class="vs-cell vs-carname"><a href="#dealer/' + a.id + '">' + carName(a) + '</a></div>' +
+      '<div class="vs-cell vs-carname"><a href="#dealer/' + b.id + '">' + carName(b) + "</a></div></div>" +
+      rows.join("") + verdict;
   }
 
   // re-render only the compare list (keeps focus in the financing inputs above it)
@@ -731,6 +847,24 @@
       var url = firstUrl(text);
       if (url && window.CARBUDDY_PARSE.parseListingUrl) {
         base = mergeListing(base, window.CARBUDDY_PARSE.parseListingUrl(url));
+      }
+      // A bare URL with no car info in it (CarMax/Cars.com links are just an ID):
+      // don't silently add an empty card — explain and let them paste the page text.
+      var urlOnly = /^https?:\/\/\S+$/.test(text);
+      var v0 = base.vehicle || {};
+      var gotInfo = v0.make || v0.model || v0.vin || num(base.salePrice) > 0;
+      if (urlOnly && !gotInfo) {
+        setImportStatus("That link doesn’t carry the car’s details (it’s just a listing ID). " +
+          "Open the listing, select-all and copy the page, then paste it here under the link — " +
+          "you’ll get the car, price, and mileage. Or add it with just the link:");
+        var pq = $("#parse-quote");
+        if (pq && !$("#add-anyway")) {
+          var btn = document.createElement("button");
+          btn.className = "btn btn-sm"; btn.id = "add-anyway"; btn.textContent = "Add with just the link";
+          pq.parentNode.insertBefore(btn, pq.nextSibling);
+          btn.addEventListener("click", function () { addParsedDealer(base); });
+        }
+        return;
       }
       addParsedDealer(base);
     } catch (e) {
@@ -928,10 +1062,13 @@
       var d = findDealer(card.getAttribute("data-id")); if (!d) return;
 
       if (e.target.closest("[data-del-dealer]")) {
-        if (confirm("Delete this dealer and its quote?")) {
-          data.dealers = data.dealers.filter(function (x) { return x.id !== d.id; });
-          save(); location.hash = "#dashboard"; renderDashboard();
-        }
+        confirmAction("Delete this dealer?",
+          "This removes " + esc(d.dealership || "this dealer") + " and its quote. It can’t be undone.",
+          "Delete dealer", function () {
+            data.dealers = data.dealers.filter(function (x) { return x.id !== d.id; });
+            save(); toast("Dealer deleted");
+            location.hash = "#dashboard"; renderDashboard();
+          });
       } else if (e.target.closest("[data-add-fee]")) {
         d.quote.fees.push({ id: uid("f_"), label: "", amount: 0, category: "negotiable", taxable: true });
         touch(d); renderDetail();
@@ -1277,26 +1414,64 @@
     }).join("");
   }
 
-  /* ================================================= GUIDE: red flags + info (F/G) */
+  /* ============================== FIELD GUIDE: tile hub (F/G + insurance + playbook) */
+  var guideView = "hub";
   function renderGuide() {
-    var flags = C.redFlags.map(function (rf) {
-      return '<div class="flag"><div class="t">🚩 ' + esc(rf.tactic) + '</div><div class="c"><b>Counter:</b> ' + esc(rf.counter) + "</div></div>";
-    }).join("");
-    var info = C.infoSharing.map(function (st) {
-      return '<div class="info-card"><div class="stage">' + esc(st.stage) + "</div>" +
-        '<div class="safe">✓ Safe to share: ' + esc(st.safe) + "</div>" +
-        '<div class="hold">✕ Hold back: ' + esc(st.hold) + "</div>" +
-        '<div class="hint">' + esc(st.note) + "</div></div>";
-    }).join("");
-    $("#section-guide").innerHTML =
-      "<h1>Field guide</h1>" +
-      '<p class="section-intro">The tactics dealers use, the counter-move for each, and exactly what personal ' +
-      "information is safe to share at each stage.</p>" +
-      "<h2>Red flags &amp; counter-moves</h2>" + flags +
-      '<div class="divider"></div>' +
-      "<h2>What’s safe to share, and when</h2>" +
-      '<p class="hint" style="margin-bottom:12px">Keep identity documents back until the price is locked in writing — ' +
-      "premature SSN/DL sharing invites a credit pull you didn’t authorize.</p>" + info + flowNav("guide");
+    var s = $("#section-guide");
+    var back = '<div class="detail-bar"><button class="btn btn-sm" data-guide="hub">← Field guide</button></div>';
+    var html;
+
+    if (guideView === "flags") {
+      html = back + "<h1>Red flags &amp; counter-moves</h1>" +
+        '<p class="section-intro">The tactics dealers use, and exactly how to answer each one.</p>' +
+        C.redFlags.map(function (rf) {
+          return '<div class="flag"><div class="t">🚩 ' + esc(rf.tactic) + '</div><div class="c"><b>Counter:</b> ' + esc(rf.counter) + "</div></div>";
+        }).join("");
+    } else if (guideView === "share") {
+      html = back + "<h1>What’s safe to share, and when</h1>" +
+        '<p class="section-intro">Keep identity documents back until the price is locked in writing — ' +
+        "premature SSN/DL sharing invites a credit pull you didn’t authorize.</p>" +
+        C.infoSharing.map(function (st) {
+          return '<div class="info-card"><div class="stage">' + esc(st.stage) + "</div>" +
+            '<div class="safe">✓ Safe to share: ' + esc(st.safe) + "</div>" +
+            '<div class="hold">✕ Hold back: ' + esc(st.hold) + "</div>" +
+            '<div class="hint">' + esc(st.note) + "</div></div>";
+        }).join("");
+    } else if (guideView === "insurance") {
+      html = back + "<h1>Finding the best car insurance</h1>" +
+        '<p class="section-intro">Insurance is part of the real cost of the car — shop it with the same ' +
+        "method: multiple quotes, identical coverage, in writing.</p>" +
+        C.insurance.map(function (st) {
+          return '<div class="step"><div class="n num">' + st.n + '</div><div class="body">' +
+            "<h3>" + esc(st.title) + "</h3><p>" + esc(st.body) + "</p></div></div>";
+        }).join("");
+    } else if (guideView === "playbook") {
+      html = back + "<h1>The full playbook</h1>" +
+        '<p class="section-intro">The complete method, start to finish. (Track your progress with the ' +
+        '<a href="#playbook">checklist</a>.)</p>' +
+        C.playbook.map(function (p) {
+          return '<div class="step"><div class="n num">' + p.n + '</div><div class="body">' +
+            "<h3>" + esc(p.title) + "</h3><p>" + esc(p.body) + "</p>" +
+            '<a class="btn btn-sm btn-ghost" href="#' + p.link + '">' + linkName(p.link) + " →</a></div></div>";
+        }).join("");
+    } else {
+      html = "<h1>Field guide</h1>" +
+        '<p class="section-intro">Reference guides for every part of the hunt — open one.</p>' +
+        '<div class="tile-grid">' +
+          '<button class="tile" data-guide="flags"><span class="tile-ico">🚩</span><span class="tile-t">Red flags</span><span class="tile-d">Dealer tactics &amp; counter-moves</span></button>' +
+          '<button class="tile" data-guide="share"><span class="tile-ico">🔐</span><span class="tile-t">Safe to share</span><span class="tile-d">What info to give, and when</span></button>' +
+          '<a class="tile" href="#fees"><span class="tile-ico">🔍</span><span class="tile-t">Fee decoder</span><span class="tile-d">Every fee, decoded</span></a>' +
+          '<button class="tile" data-guide="insurance"><span class="tile-ico">🛡️</span><span class="tile-t">Car insurance</span><span class="tile-d">Finding the best coverage</span></button>' +
+          '<button class="tile" data-guide="playbook"><span class="tile-ico">🧭</span><span class="tile-t">Full playbook</span><span class="tile-d">The whole method, in prose</span></button>' +
+        "</div>" + flowNav("guide");
+    }
+    s.innerHTML = html;
+    var tiles = s.querySelectorAll("[data-guide]");
+    for (var i = 0; i < tiles.length; i++) {
+      tiles[i].addEventListener("click", function () {
+        guideView = this.getAttribute("data-guide"); renderGuide(); window.scrollTo(0, 0);
+      });
+    }
   }
 
   /* ================================================================ DATA (H) */
@@ -1329,9 +1504,10 @@
       reader.readAsText(file);
     });
     $("#clear-btn").addEventListener("click", function () {
-      if (confirm("Delete all dealers and reset? This cannot be undone.")) {
-        data = defaultData(); save(); renderAll(); toast("Cleared");
-      }
+      confirmAction("Clear all data?", "Every dealer, quote, and setting will be deleted. This cannot be undone.",
+        "Clear everything", function () {
+          data = defaultData(); data.ui.onboarded = true; save(); renderAll(); toast("Cleared");
+        });
     });
   }
 
@@ -1511,9 +1687,17 @@
     if (onbStep === 2) wireFinancing(o, function () {});
     var car = o.querySelector("#onb-carousel");
     if (car) car.addEventListener("scroll", function () {
-      var i = Math.round(car.scrollLeft / car.clientWidth);
+      // pick the card whose center is nearest the viewport center (cards are 86% wide + gaps)
+      var center = car.scrollLeft + car.clientWidth / 2;
+      var cards2 = car.querySelectorAll(".onb-card");
+      var best = 0, bestDist = Infinity;
+      for (var c2 = 0; c2 < cards2.length; c2++) {
+        var mid = cards2[c2].offsetLeft + cards2[c2].offsetWidth / 2;
+        var dist = Math.abs(mid - center);
+        if (dist < bestDist) { bestDist = dist; best = c2; }
+      }
       var dots2 = o.querySelectorAll(".onb-dot");
-      for (var k = 0; k < dots2.length; k++) dots2[k].classList.toggle("on", k === i);
+      for (var k = 0; k < dots2.length; k++) dots2[k].classList.toggle("on", k === best);
     }, { passive: true });
   }
 
